@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "nexus-free": {
+      "type": "stdio",
+      "command": "${USERPROFILE}\\.nexus\\nexus-free\\NexusFree.exe",
+      "args": [
+        "--mcp"
+      ]
+    }
+  }
+}

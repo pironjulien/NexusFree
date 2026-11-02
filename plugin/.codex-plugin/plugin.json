@@ -1,0 +1,21 @@
+{
+  "name": "nexus-free",
+  "displayName": "Nexus Free",
+  "version": "1.0.0",
+  "description": "Administrator elevation and SYSTEM privileged execution without UAC friction for the Trinity. Starts the native NexusFree engine.",
+  "author": {
+    "name": "Julien Piron",
+    "url": "https://github.com/pironjulien"
+  },
+  "homepage": "https://julienpiron.fr/nexusfree/",
+  "repository": "https://github.com/pironjulien/NexusFree",
+  "license": "MIT",
+  "keywords": [
+    "elevation",
+    "admin",
+    "system",
+    "uac",
+    "mcp"
+  ],
+  "icon": "./assets/logo.png"
+}
