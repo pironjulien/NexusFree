@@ -89,8 +89,13 @@ if ($Apply) {
         displayName = "NexusFree"
         version = "1.0.0"
         description = "Moteur d'élévation souverain et exécution privilégiée SYSTEM sans UAC pour la Trinité (C# natif)."
-        author = "Julien Piron"
-    } | ConvertTo-Json -Depth 3
+        logo = "logo.png"
+        author = [ordered]@{
+            name = "Julien Piron"
+            url = "https://julienpiron.fr"
+        }
+        keywords = @("elevation", "admin", "system", "uac", "mcp", "trinite")
+    } | ConvertTo-Json -Depth 4
     Set-Content -LiteralPath (Join-Path $agyPluginDir 'plugin.json') -Value $pluginJson -Encoding utf8
 
     $mcpJson = [ordered]@{

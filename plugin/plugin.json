@@ -3,5 +3,10 @@
   "displayName": "NexusFree",
   "version": "1.0.0",
   "description": "Moteur d'élévation souverain et exécution privilégiée SYSTEM sans UAC pour la Trinité (C# natif).",
-  "author": "Julien Piron"
+  "logo": "logo.png",
+  "author": {
+    "name": "Julien Piron",
+    "url": "https://julienpiron.fr"
+  },
+  "keywords": ["elevation", "admin", "system", "uac", "mcp", "trinite"]
 }
