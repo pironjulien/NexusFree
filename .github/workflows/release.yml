@@ -1,0 +1,110 @@
+# Release, in two channels, with the shared Nexus release workflows of NexusSystem.
+# - Development: every push to main runs test.ps1 and builds the engine for Windows x64 and Arm64 (self-contained
+#   single file, no .NET to install): NexusFree-win-x64.zip and NexusFree-win-arm64.zip (engine, install.ps1, the
+#   SYSTEM dispatcher and its setup, Antigravity's plugin), get.ps1 and SHA256SUMS.txt. product-dev-release attests
+#   them and publishes the pre-release vX.Y.Z-dev.N.
+# - Stable: right after that build when its version is not released yet, or "Run workflow" (promote: a vX.Y.Z-dev.N,
+#   or empty for the newest), product-promote publishes the SAME files as vX.Y.Z with the CHANGELOG section.
+#   NexusFree is not sent to the MCP registry. get.ps1 installs from releases/latest.
+# Actions and shared workflows pinned by commit SHA; Dependabot (github-actions) keeps them up to date.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      promote:
+        description: Development build to publish as stable (vX.Y.Z-dev.N; empty = the newest)
+        required: false
+        default: ''
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68  # v6.0.0
+        with:
+          global-json-file: global.json
+      - name: One version everywhere
+        id: version
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content src/NexusFree/NexusFree.csproj -Raw)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "src/NexusFree/NexusFree.csproj: no X.Y.Z version ($version)." }
+          $found = [ordered]@{
+            'src/NexusFree/McpServer.cs' = [regex]::Match((Get-Content src/NexusFree/McpServer.cs -Raw), 'ServerVersion = "([^"]+)"').Groups[1].Value
+            'plugin/plugin.json' = (Get-Content plugin/plugin.json -Raw | ConvertFrom-Json).version
+            'plugin/.claude-plugin/plugin.json' = (Get-Content plugin/.claude-plugin/plugin.json -Raw | ConvertFrom-Json).version
+            'plugin/.codex-plugin/plugin.json' = (Get-Content plugin/.codex-plugin/plugin.json -Raw | ConvertFrom-Json).version
+          }
+          $wrong = @($found.GetEnumerator() | Where-Object { $_.Value -ne $version } | ForEach-Object { "$($_.Key)=$($_.Value)" })
+          if ($wrong) { throw "Version $version expected: $($wrong -join ', ')" }
+          if (-not (Select-String -Path CHANGELOG.md -SimpleMatch "## [$version]" -Quiet)) { throw "CHANGELOG.md has no [$version] section." }
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Tests (test.ps1)
+        shell: pwsh
+        run: ./test.ps1
+      - name: Build and pack
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          foreach ($rid in 'win-x64', 'win-arm64') {
+            $out = Join-Path $env:RUNNER_TEMP "publish-$rid"
+            dotnet publish src/NexusFree/NexusFree.csproj -c Release -r $rid --self-contained true -p:PublishSingleFile=true -o $out
+            if ($LASTEXITCODE) { throw "dotnet publish $rid failed." }
+            if (-not (Test-Path "$out/NexusFree.exe")) { throw "$rid output incomplete." }
+            Get-ChildItem $out -Filter *.pdb | Remove-Item
+            Copy-Item install.ps1, LICENSE, README.md, SECURITY.md $out
+            Copy-Item daemon, plugin $out -Recurse
+            Compress-Archive -Path "$out/*" -DestinationPath "dist/NexusFree-$rid.zip"
+          }
+          $version = & "$env:RUNNER_TEMP/publish-win-x64/NexusFree.exe" --version
+          if ($LASTEXITCODE -or $version -notmatch 'NexusFree v') { throw 'The x64 build does not start.' }
+          Copy-Item get.ps1 dist  # the installer too, checked and attested like the packages
+          Get-ChildItem dist -File | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name } |
+            Set-Content dist/SHA256SUMS.txt -Encoding utf8NoBOM
+          Get-Content dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: dist
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 3
+
+  dev:
+    needs: build
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    uses: pironjulien/NexusSystem/.github/workflows/product-dev-release.yml@9cf03f2ac93e207307351b393130ff1cfe2aef7b  # v1.6.40
+    with:
+      product: NexusFree
+      version: ${{ needs.build.outputs.version }}
+
+  promote:
+    # Right after the push that built a new version (same files), or by hand ("Run workflow").
+    needs: dev
+    if: always() && (needs.dev.result == 'success' || github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: write
+      id-token: write
+    uses: pironjulien/NexusSystem/.github/workflows/product-promote.yml@9cf03f2ac93e207307351b393130ff1cfe2aef7b  # v1.6.40
+    with:
+      product: NexusFree
+      promote: ${{ inputs.promote || needs.dev.outputs.tag }}

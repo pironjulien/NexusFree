@@ -1,8 +1,8 @@
 {
   "name": "nexus-free",
   "displayName": "NexusFree",
-  "version": "1.0.0",
-  "description": "Moteur d'élévation souverain et exécution privilégiée SYSTEM sans UAC pour la Trinité (C# natif).",
+  "version": "1.1.0",
+  "description": "Administrator and SYSTEM commands without a UAC prompt each time, for the account that installed NexusFree (native C#).",
   "logo": "logo.png",
   "author": {
     "name": "Julien Piron",

@@ -1,7 +1,15 @@
-# install.ps1
-# Installe et qualifie le produit NexusFree (binaire natif, sas SYSTEM, tâche planifiée et plugins IA).
-# Usage : pwsh -NoProfile -File install.ps1 [-Apply]
-
+﻿# install.ps1
+# Installs NexusFree for the current Windows account: the native engine in %USERPROFILE%\.nexus\nexus-free, then, with
+# -Apply, the SYSTEM side (dispatcher, spool ACLs, scheduled task, see daemon\setup-system.ps1) and Antigravity's
+# plugin. Claude Code and Codex get the plugin from the NexusSystem catalog.
+#
+# Run it as the account that will use NexusFree, not from an elevated prompt of another account: that account is the
+# only one authorized. The SYSTEM side needs one elevation: through NexusFree itself when it is already installed for
+# this account (update), otherwise one UAC prompt.
+#
+# From a release package, NexusFree.exe sits next to this script; from the source repository, it is built with dotnet.
+#
+# Usage: powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 [-Apply]
 [CmdletBinding()]
 param(
     [switch]$Apply
@@ -10,151 +18,101 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$productName = 'NexusFree'
 $taskName = 'NexusFree'
 $binDir = Join-Path $env:USERPROFILE '.nexus\nexus-free'
 $exePath = Join-Path $binDir 'NexusFree.exe'
-$installFilesDir = Join-Path $env:ProgramFiles 'NexusFree'
-$installedDispatcher = Join-Path $installFilesDir 'Dispatch-NexusFree.ps1'
-$sourceDispatcher = Join-Path $PSScriptRoot 'daemon\Dispatch-NexusFree.ps1'
-
-$spoolDir = Join-Path $env:ProgramData 'NexusFree'
-$inboxDir = Join-Path $spoolDir 'inbox'
-$stagingDir = Join-Path $spoolDir 'staging'
-$outboxDir = Join-Path $spoolDir 'outbox'
-$logDir = Join-Path $spoolDir 'logs'
+$daemonDir = Join-Path $PSScriptRoot 'daemon'
+$pluginDir = Join-Path $PSScriptRoot 'plugin'
+$userSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 
 function Test-IsAdmin {
     $current = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
     return $current.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-function Invoke-PrivilegedScript([string]$ScriptBlockText) {
+# The SYSTEM side through the NexusFree already installed for this account: same protocol as NexusFree.exe (a request
+# in the inbox, the task started, the answer read from the outbox).
+function Invoke-ThroughNexusFree([string]$Command) {
+    $spool = Join-Path $env:ProgramData 'NexusFree'
+    $config = Join-Path $env:ProgramFiles 'NexusFree\config.json'
+    if (-not (Test-Path -LiteralPath (Join-Path $spool 'inbox'))) { return $null }
+    # 1.0 had no config.json and accepted every account: usable once, to install this version's restrictions.
+    if (Test-Path -LiteralPath $config) {
+        $authorized = try { [string](Get-Content -LiteralPath $config -Raw | ConvertFrom-Json).userSid } catch { '' }
+        if ($authorized -ne $userSid) { return $null }
+    }
+    $id = 'req-' + [guid]::NewGuid().ToString('N')
+    $request = @{ id = $id; command = $Command; created = (Get-Date).ToUniversalTime().ToString('o') } | ConvertTo-Json
+    [IO.File]::WriteAllText((Join-Path $spool "inbox\$id.json"), $request, [Text.UTF8Encoding]::new($false))
+    schtasks.exe /run /tn $taskName | Out-Null
+    $answer = Join-Path $spool "outbox\$id.json"
+    $deadline = (Get-Date).AddMinutes(5)
+    while (-not (Test-Path -LiteralPath $answer)) {
+        if ((Get-Date) -gt $deadline) { throw 'NexusFree did not answer within 5 minutes.' }
+        Start-Sleep -Milliseconds 300
+    }
+    Start-Sleep -Milliseconds 200
+    $result = Get-Content -LiteralPath $answer -Raw | ConvertFrom-Json
+    Remove-Item -LiteralPath $answer -Force -ErrorAction SilentlyContinue
+    return $result
+}
+
+function Invoke-Setup {
+    $setup = Join-Path $daemonDir 'setup-system.ps1'
+    $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$setup`" -UserSid $userSid -SourceDir `"$daemonDir`""
     if (Test-IsAdmin) {
-        Invoke-Expression $ScriptBlockText
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup -UserSid $userSid -SourceDir $daemonDir
+        if ($LASTEXITCODE) { throw "setup-system.ps1 failed ($LASTEXITCODE)." }
         return
     }
-
-    # Tentative via le pont existant si actif
-    $adminBridgeScript = "C:\Users\julie\OneDrive\Documents\NexusInfra\ops\workstation\Invoke-NexusAdminBridge.ps1"
-    if (Test-Path -LiteralPath $adminBridgeScript) {
-        $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($ScriptBlockText))
-        $cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded"
-        $res = & $adminBridgeScript -Command $cmd
-        if (-not $res.success) {
-            throw "Échec installation privilégiée via pont : $($res.error)"
-        }
+    # Single quotes only: 1.0's dispatcher lost double quotes on the way to its PowerShell.
+    function Quote([string]$Text) { "'" + $Text.Replace("'", "''") + "'" }
+    $viaFree = Invoke-ThroughNexusFree "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $(Quote $setup) -UserSid $userSid -SourceDir $(Quote $daemonDir)"
+    if ($viaFree) {
+        if (-not $viaFree.success) { throw "SYSTEM setup through NexusFree failed: $($viaFree.error) $($viaFree.output)" }
         return
     }
-
-    # Repli élévation UAC
-    Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile', '-Command', $ScriptBlockText)
+    $process = Start-Process powershell.exe -Verb RunAs -Wait -PassThru -ArgumentList $arguments
+    if ($process.ExitCode) { throw "SYSTEM setup failed or was declined ($($process.ExitCode))." }
 }
 
-Write-Host "=== Publication de NexusFree (C# .NET) ==="
-$srcProj = Join-Path $PSScriptRoot 'src\NexusFree\NexusFree.csproj'
+Write-Host '=== NexusFree engine ==='
 New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-
-dotnet publish $srcProj -c Release -o $binDir --nologo | Out-Null
-if (-not (Test-Path -LiteralPath $exePath)) {
-    throw "Échec de publication : $exePath introuvable."
+$packaged = Join-Path $PSScriptRoot 'NexusFree.exe'
+$built = $null
+if (-not (Test-Path -LiteralPath $packaged)) {
+    $built = Join-Path ([IO.Path]::GetTempPath()) "nexusfree-publish-$PID"
+    dotnet publish (Join-Path $PSScriptRoot 'src\NexusFree\NexusFree.csproj') -c Release -r win-$($env:PROCESSOR_ARCHITECTURE.ToLower() -replace 'amd64', 'x64') --self-contained true -p:PublishSingleFile=true -o $built --nologo | Out-Null
+    if ($LASTEXITCODE) { throw 'dotnet publish failed.' }
+    $packaged = Join-Path $built 'NexusFree.exe'
 }
-Write-Host "Binaire disponible : $exePath"
+# Engines of open AI sessions keep running the old file: renamed aside (Windows allows it), removed on a later run.
+Get-ChildItem -LiteralPath $binDir -Filter 'NexusFree.exe.old-*' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $exePath) {
+    try { Remove-Item -LiteralPath $exePath -Force } catch { Rename-Item -LiteralPath $exePath -NewName "NexusFree.exe.old-$([guid]::NewGuid().ToString('N').Substring(0, 8))" }
+}
+Copy-Item -LiteralPath $packaged -Destination $exePath -Force
+if ($built) { Remove-Item -LiteralPath $built -Recurse -Force -ErrorAction SilentlyContinue }
+if (-not (Test-Path -LiteralPath $exePath)) { throw "Engine missing: $exePath" }
+Write-Host "Engine: $exePath"
 
 if ($Apply) {
-    Write-Host "=== Configuration du moteur SYSTEM ==="
-    $setupScript = Join-Path $PSScriptRoot 'daemon\setup-system.ps1'
-    if (Test-IsAdmin) {
-        & pwsh.exe -NoProfile -ExecutionPolicy Bypass -File $setupScript
-    } else {
-        $adminBridgeScript = "C:\Users\julie\OneDrive\Documents\NexusInfra\ops\workstation\Invoke-NexusAdminBridge.ps1"
-        if (Test-Path -LiteralPath $adminBridgeScript) {
-            $res = & $adminBridgeScript -Command "pwsh.exe -NoProfile -ExecutionPolicy Bypass -File `"$setupScript`""
-            if (-not $res.success) {
-                throw "Échec configuration SYSTEM : $($res.error)"
-            }
-        } else {
-            Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $setupScript)
-        }
-    }
-    Write-Host "Moteur SYSTEM '$taskName' configuré."
+    Write-Host '=== SYSTEM side ==='
+    Invoke-Setup
+    Write-Host "SYSTEM task '$taskName' configured for this account ($userSid)."
 
-    Write-Host "=== Configuration du plugin Antigravity ==="
+    Write-Host '=== Antigravity plugin ==='
     $agyPluginDir = Join-Path $env:USERPROFILE '.gemini\config\plugins\nexus-free'
-    $agySkillDir = Join-Path $agyPluginDir 'skills\nexus-free'
-    New-Item -ItemType Directory -Force -Path $agySkillDir | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $agyPluginDir 'skills\nexus-free') | Out-Null
+    Copy-Item -LiteralPath (Join-Path $pluginDir 'plugin.json'), (Join-Path $pluginDir 'logo.png') -Destination $agyPluginDir -Force
+    Copy-Item -LiteralPath (Join-Path $pluginDir 'skills\nexus-free\SKILL.md') -Destination (Join-Path $agyPluginDir 'skills\nexus-free') -Force
+    # Antigravity starts the command as written: the engine's absolute path for this account.
+    $mcp = @{ mcpServers = @{ 'nexus-free' = @{ command = $exePath; args = @('--mcp') } } } | ConvertTo-Json -Depth 4
+    [IO.File]::WriteAllText((Join-Path $agyPluginDir 'mcp_config.json'), $mcp, [Text.UTF8Encoding]::new($false))
+    Write-Host "Antigravity plugin: $agyPluginDir"
 
-    $pluginJson = [ordered]@{
-        name = "nexus-free"
-        displayName = "NexusFree"
-        version = "1.0.0"
-        description = "Moteur d'élévation souverain et exécution privilégiée SYSTEM sans UAC pour la Trinité (C# natif)."
-        logo = "logo.png"
-        author = [ordered]@{
-            name = "Julien Piron"
-            url = "https://julienpiron.fr"
-        }
-        keywords = @("elevation", "admin", "system", "uac", "mcp", "trinite")
-    } | ConvertTo-Json -Depth 4
-    Set-Content -LiteralPath (Join-Path $agyPluginDir 'plugin.json') -Value $pluginJson -Encoding utf8
-
-    $mcpJson = [ordered]@{
-        mcpServers = [ordered]@{
-            "nexus-free" = [ordered]@{
-                command = $exePath
-                args = @("--mcp")
-            }
-        }
-    } | ConvertTo-Json -Depth 4
-    Set-Content -LiteralPath (Join-Path $agyPluginDir 'mcp_config.json') -Value $mcpJson -Encoding utf8
-
-    $skillMd = @'
----
-name: nexus-free
-description: Exécuter toute commande ou script Windows nécessitant les privilèges Administrateur / SYSTEM sans invite UAC (sfc, dism, services, registre machine HKLM, drivers, installations).
----
-
-# NexusFree (v1.0.0)
-
-Serveur MCP d'élévation souveraine universelle partagé par la Trinité (Claude, Codex, Antigravity).
-
-## Outils disponibles
-
-### `free(command, timeout_seconds=600)`
-Exécute n'importe quelle commande PowerShell ou binaire avec les droits `SYSTEM` sans aucune fenêtre UAC.
-* `command` (requis) : chaîne de commande exacte à exécuter (ex. `sfc /scannow`, `Restart-Service wuauserv`, `Get-Process`).
-* `timeout_seconds` (optionnel, défaut 600) : délai limite en secondes.
-* Retour : code de sortie, `stdout`, `stderr`, durée d'exécution.
-
-### `free_status()`
-Vérifie la santé du pont SYSTEM, l'état de la tâche planifiée et du sas de communication.
-'@
-    Set-Content -LiteralPath (Join-Path $agySkillDir 'SKILL.md') -Value $skillMd -Encoding utf8
-    Write-Host "Plugin Antigravity configuré : $agyPluginDir"
-
-    Write-Host "=== Configuration du plugin Claude Code ==="
-    $claudeConfig = Join-Path $env:APPDATA 'Claude\claude_desktop_config.json'
-    if (Test-Path -LiteralPath $claudeConfig) {
-        try {
-            $cJson = Get-Content -LiteralPath $claudeConfig -Raw -Encoding utf8 | ConvertFrom-Json
-            if (-not $cJson.mcpServers) { $cJson | Add-Member -MemberType NoteProperty -Name mcpServers -Value ([ordered]@{}) }
-            $cJson.mcpServers | Add-Member -MemberType NoteProperty -Name "nexus-free" -Value ([ordered]@{
-                command = $exePath
-                args = @("--mcp")
-            }) -Force
-            $cJson | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $claudeConfig -Encoding utf8
-            Write-Host "Plugin Claude configuré dans $claudeConfig"
-        } catch {
-            Write-Warning "Claude config mise à jour ignorée : $($_.Exception.Message)"
-        }
-    }
-
-    # Recopie miroir dans le dossier plugin/ du dépôt pour distribution
-    $repoPluginDir = Join-Path $PSScriptRoot 'plugin'
-    New-Item -ItemType Directory -Force -Path (Join-Path $repoPluginDir 'skills\nexus-free') | Out-Null
-    Copy-Item -LiteralPath (Join-Path $agyPluginDir 'plugin.json') -Destination (Join-Path $repoPluginDir 'plugin.json') -Force
-    Copy-Item -LiteralPath (Join-Path $agyPluginDir 'mcp_config.json') -Destination (Join-Path $repoPluginDir 'mcp_config.json') -Force
-    Copy-Item -LiteralPath (Join-Path $agySkillDir 'SKILL.md') -Destination (Join-Path $repoPluginDir 'skills\nexus-free\SKILL.md') -Force
+    $status = & $exePath --status | ConvertFrom-Json
+    if (-not $status.installed) { throw "NexusFree is not ready: $($status.taskStatus)" }
 }
 
-Write-Host "NexusFree installation terminée avec succès."
+Write-Host 'NexusFree installed.'

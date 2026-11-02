@@ -3,7 +3,7 @@ name: nexus-free
 description: Exécuter toute commande ou script Windows nécessitant les privilèges Administrateur / SYSTEM sans invite UAC (sfc, dism, services, registre machine HKLM, drivers, installations).
 ---
 
-# NexusFree (v1.0.0)
+# NexusFree
 
 Serveur MCP d'élévation souveraine universelle partagé par la Trinité (Claude, Codex, Antigravity).
 

@@ -1,4 +1,4 @@
-# Dispatch-NexusFree.ps1
+﻿# Dispatch-NexusFree.ps1
 # Exécuteur privilégié du pont d'élévation universel NexusFree.
 # Tourne sous SYSTEM via la tâche planifiée « NexusFree ».
 # Sas de travail : %ProgramData%\NexusFree
@@ -18,7 +18,7 @@ $logFile = Join-Path $logDir 'elevation.log'
 
 foreach ($dir in @($inboxDir, $stagingDir, $outboxDir, $logDir)) {
     if (-not (Test-Path -LiteralPath $dir)) {
-        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        exit 1  # jamais recréé ici : sans les ACL de setup-system.ps1, tout compte pourrait y écrire
     }
 }
 
@@ -27,6 +27,17 @@ function Write-BridgeLog([string]$Message, [string]$Level = 'INFO') {
     $line = "[$timestamp] [$Level] $Message"
     Add-Content -LiteralPath $logFile -Value $line -Encoding utf8 -ErrorAction SilentlyContinue
 }
+
+# Compte autorisé par setup-system.ps1. Sans lui, rien ne s'exécute : l'ACL du sas seule ne suffit pas.
+$configFile = Join-Path $PSScriptRoot 'config.json'
+$authorized = try { [string](Get-Content -LiteralPath $configFile -Raw -Encoding utf8 | ConvertFrom-Json).userSid } catch { '' }
+if (-not $authorized) {
+    Write-BridgeLog "Aucun compte autorisé dans $configFile : relancer install.ps1 -Apply." 'ERROR'
+    exit 1
+}
+# Une requête ne vaut que si son fichier appartient au compte autorisé (ou aux Administrateurs ou à SYSTEM : le
+# propriétaire d'un fichier créé depuis une session élevée).
+$owners = @($authorized, 'S-1-5-32-544', 'S-1-5-18')
 
 $pending = @(Get-ChildItem -LiteralPath $inboxDir -Filter '*.json' -File -ErrorAction SilentlyContinue)
 if ($pending.Count -eq 0) { exit 0 }
@@ -50,6 +61,10 @@ foreach ($item in $pending) {
     $started = Get-Date
 
     try {
+        $owner = (Get-Acl -LiteralPath $targetStaging).GetOwner([Security.Principal.SecurityIdentifier]).Value
+        if ($owner -notin $owners) {
+            throw "Requête refusée : son fichier appartient à $owner, pas au compte autorisé."
+        }
         $raw = Get-Content -LiteralPath $targetStaging -Raw -Encoding utf8
         $req = $raw | ConvertFrom-Json
 
@@ -60,13 +75,17 @@ foreach ($item in $pending) {
 
         Write-BridgeLog "Exécution commande requête $id : $cmd" 'INFO'
 
-        $pwshExe = (Get-Command pwsh.exe -ErrorAction SilentlyContinue)?.Source
+        $pwshExe = Get-Command pwsh.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
         if (-not $pwshExe) { $pwshExe = "$env:windir\System32\WindowsPowerShell\v1.0\powershell.exe" }
 
         $stdoutFile = Join-Path $stagingDir "$id.stdout"
         $stderrFile = Join-Path $stagingDir "$id.stderr"
 
-        $proc = Start-Process -FilePath $pwshExe -ArgumentList @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', $cmd) -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+        # Commande encodée : passée telle quelle, guillemets compris (Start-Process recolle les arguments sans les citer).
+        # Sortie en UTF-8, celle que lit le répartiteur, y compris pour les programmes natifs (whoami, sfc...).
+        $prelude = '$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); chcp.com 65001 > $null; '
+        $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($prelude + $cmd))
+        $proc = Start-Process -FilePath $pwshExe -ArgumentList @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encoded) -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
 
         $exitCode = $proc.ExitCode
         $stdoutText = if (Test-Path -LiteralPath $stdoutFile) { Get-Content -LiteralPath $stdoutFile -Raw -Encoding utf8 } else { '' }

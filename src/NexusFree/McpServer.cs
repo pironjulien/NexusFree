@@ -11,7 +11,7 @@ namespace NexusFree;
 public sealed class McpServer
 {
     public const string ServerName = "nexus-free";
-    public const string ServerVersion = "1.0.0";
+    public const string ServerVersion = "1.1.0";
     private static readonly HashSet<string> Protocols = ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"];
 
     public static async Task RunStdioAsync(CancellationToken ct = default)
