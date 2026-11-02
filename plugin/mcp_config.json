@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "nexus-free": {
-      "command": "C:\\Users\\julie\\.nexus\\nexus-free\\NexusFree.exe",
+      "command": "%USERPROFILE%\\.nexus\\nexus-free\\NexusFree.exe",
       "args": [
         "--mcp"
       ]
