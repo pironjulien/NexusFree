@@ -8,6 +8,8 @@ public static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        WriteStatusFile();
+
         if (args.Contains("--version") || args.Contains("-v"))
         {
             Console.WriteLine($"NexusFree v{McpServer.ServerVersion}");
@@ -37,5 +39,28 @@ public static class Program
         // Mode par défaut ou avec --mcp : serveur MCP stdio
         await McpServer.RunStdioAsync();
         return 0;
+    }
+
+    public static void WriteStatusFile()
+    {
+        try
+        {
+            var user = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var dir = System.IO.Path.Combine(user, ".nexus", "status");
+            System.IO.Directory.CreateDirectory(dir);
+            var file = System.IO.Path.Combine(dir, "free.json");
+            var json = $$"""
+            {
+              "product": "free",
+              "version": "{{McpServer.ServerVersion}}",
+              "latest": "{{McpServer.ServerVersion}}",
+              "state": "idle",
+              "checked_at": "{{DateTimeOffset.UtcNow:o}}",
+              "message": "up to date"
+            }
+            """;
+            System.IO.File.WriteAllText(file, json);
+        }
+        catch { }
     }
 }
