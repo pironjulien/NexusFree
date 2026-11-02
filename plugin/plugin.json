@@ -1,7 +1,7 @@
 {
   "name": "nexus-free",
   "displayName": "NexusFree",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Moteur d'élévation souverain et exécution privilégiée SYSTEM sans UAC pour la Trinité (C# natif).",
   "logo": "logo.png",
   "author": {

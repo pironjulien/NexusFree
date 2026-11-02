@@ -1,6 +1,6 @@
 {
   "name": "nexus-free",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Administrator elevation and SYSTEM privileged execution without UAC friction for the Trinity. Starts the native NexusFree engine.",
   "author": {
     "name": "Julien Piron",
