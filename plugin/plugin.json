@@ -1,0 +1,7 @@
+{
+  "name": "nexus-free",
+  "displayName": "NexusFree",
+  "version": "1.0.0",
+  "description": "Moteur d'élévation souverain et exécution privilégiée SYSTEM sans UAC pour la Trinité (C# natif).",
+  "author": "Julien Piron"
+}

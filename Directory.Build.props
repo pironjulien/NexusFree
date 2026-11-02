@@ -1,0 +1,8 @@
+<Project>
+  <!-- Builds and test outputs outside OneDrive: %USERPROFILE%\.nexus\build\nexusfree\<project>. -->
+  <PropertyGroup>
+    <NexusFreeBuild>$(USERPROFILE)\.nexus\build\nexusfree\$(MSBuildProjectName)\</NexusFreeBuild>
+    <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)' == ''">$(NexusFreeBuild)obj\</BaseIntermediateOutputPath>
+    <BaseOutputPath Condition="'$(BaseOutputPath)' == ''">$(NexusFreeBuild)bin\</BaseOutputPath>
+  </PropertyGroup>
+</Project>
