@@ -8,7 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - The test host isolates all journal writes in a temporary home, including the `free_status` protocol test.
   Tests sharing global environment and static agent state run serially, so journal overrides cannot race or
-  append synthetic calls to the real user's history. Existing journals are left intact.
+  append synthetic calls to the real user's history. Existing journals are left intact. The test host sends only
+  its validated temporary journal fixture to the Recycle Bin and keeps it if recycling is unavailable.
 
 ## [1.2.3] - 2026-11-03
 

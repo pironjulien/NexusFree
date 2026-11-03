@@ -18,9 +18,30 @@ internal static class TestEnvironment
         Environment.SetEnvironmentVariable("NEXUS_AGENT", null);
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {
-            try { Directory.Delete(JournalHome, true); }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+            try
+            {
+                var root = Path.GetFullPath(JournalHome);
+                var temporary = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar);
+                if (!string.Equals(Path.GetDirectoryName(root), temporary, StringComparison.OrdinalIgnoreCase)
+                    || !Path.GetFileName(root).StartsWith("nexusfree-tests-", StringComparison.Ordinal)) return;
+                var pending = new Stack<string>(); pending.Push(root);
+                while (pending.TryPop(out var directory))
+                {
+                    if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0) return;
+                    foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
+                    {
+                        var attributes = File.GetAttributes(entry);
+                        if ((attributes & FileAttributes.ReparsePoint) != 0) return;
+                        if ((attributes & FileAttributes.Directory) != 0) pending.Push(entry);
+                        else if (!Path.GetExtension(entry).Equals(".jsonl", StringComparison.OrdinalIgnoreCase)) return;
+                    }
+                }
+                Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(root,
+                    Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                    Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin,
+                    Microsoft.VisualBasic.FileIO.UICancelOption.DoNothing);
+            }
+            catch (Exception) { } // Keep the owned fixture when recycling is unavailable; never delete as a fallback.
         };
     }
 }
