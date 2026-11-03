@@ -3,7 +3,12 @@
 All notable changes to the **NexusFree** product are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.2.0] - 2026-11-03
+
+### Added
+- Standard Nexus unified logging: tool calls (`free`, `free_status`) are now logged to the central audit journal (`%USERPROFILE%\.nexus\journal\free\<agent>\<YYYY-MM>.jsonl`) following the schema v1 format with execution latency, exit code, agent attribution, and sanitized errors.
+- Support for `--agent <agent>` argument on startup, environment variable `NEXUS_AGENT`, and client attribution on MCP initialize.
+- Comprehensive journal test suite (`JournalTests.cs`).
 
 ### Fixed
 - Accents in the output of native programs that ignore `chcp 65001` without a console (`dism`, `netsh`...) are no

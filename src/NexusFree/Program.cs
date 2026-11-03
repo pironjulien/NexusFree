@@ -8,6 +8,13 @@ public static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        int agentIndex = Array.IndexOf(args, "--agent");
+        if (agentIndex >= 0 && agentIndex + 1 < args.Length)
+        {
+            McpServer.ConfiguredAgent = args[agentIndex + 1];
+            McpServer.CurrentAgent = Journal.NormalizeAgent(args[agentIndex + 1]);
+        }
+
         WriteStatusFile();
 
         if (args.Contains("--version") || args.Contains("-v"))

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -11,7 +12,9 @@ namespace NexusFree;
 public sealed class McpServer
 {
     public const string ServerName = "nexus-free";
-    public const string ServerVersion = "1.1.0";
+    public const string ServerVersion = "1.2.0";
+    public static string? ConfiguredAgent { get; set; }
+    public static string CurrentAgent { get; set; } = "antigravity";
     private static readonly HashSet<string> Protocols = ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"];
 
     public static async Task RunStdioAsync(CancellationToken ct = default)
@@ -70,6 +73,9 @@ public sealed class McpServer
 
         if (method == "initialize")
         {
+            string? clientName = req["params"]?["clientInfo"]?["name"]?.ToString();
+            CurrentAgent = Journal.IdentifyAgent(clientName);
+
             return new JsonObject
             {
                 ["jsonrpc"] = "2.0",
@@ -123,6 +129,7 @@ public sealed class McpServer
 
             bool isError = false;
             string resultText;
+            var sw = Stopwatch.StartNew();
 
             try
             {
@@ -132,6 +139,7 @@ public sealed class McpServer
                     int timeout = args["timeout_seconds"]?.GetValue<int>() ?? 600;
 
                     var res = await Engine.ExecuteAsync(command, timeout, ct);
+                    sw.Stop();
                     isError = !res.Success;
 
                     var sb = new StringBuilder();
@@ -145,22 +153,31 @@ public sealed class McpServer
                         sb.AppendLine($"[Erreur] {res.Error.TrimEnd()}");
                     }
                     resultText = sb.ToString();
+
+                    Journal.Write(CurrentAgent, "free", command, res.Id, res.Success, res.ExitCode, sw.Elapsed.TotalMilliseconds, res.Error);
                 }
                 else if (toolName == "free_status")
                 {
                     var status = Engine.GetStatus();
+                    sw.Stop();
                     resultText = status.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+                    bool installed = status["installed"]?.GetValue<bool>() ?? false;
+                    Journal.Write(CurrentAgent, "free_status", null, null, installed, installed ? 0 : 1, sw.Elapsed.TotalMilliseconds, null);
                 }
                 else
                 {
+                    sw.Stop();
                     isError = true;
                     resultText = $"Outil inconnu : {toolName}";
+                    Journal.Write(CurrentAgent, toolName, null, null, false, 1, sw.Elapsed.TotalMilliseconds, "Outil inconnu");
                 }
             }
             catch (Exception ex)
             {
+                sw.Stop();
                 isError = true;
                 resultText = $"Erreur d'exécution de l'outil {toolName} : {ex.Message}";
+                Journal.Write(CurrentAgent, toolName, null, null, false, 1, sw.Elapsed.TotalMilliseconds, ex.Message);
             }
 
             return new JsonObject
