@@ -3,6 +3,12 @@
 All notable changes to the **NexusFree** product are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.2] - 2026-11-03
+
+### Security
+- Enable immutable GitHub releases for the repository. This release carries GitHub's release attestation in addition
+  to the existing asset checksums and build provenance, so its published assets and tag cannot be replaced.
+
 ## [1.2.1] - 2026-11-03
 
 ### Changed
