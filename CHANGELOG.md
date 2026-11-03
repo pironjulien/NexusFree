@@ -3,6 +3,13 @@
 All notable changes to the **NexusFree** product are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.3] - 2026-11-03
+
+### Changed
+- Describe NexusFree consistently as the direct route for every Windows operation requiring Administrator / SYSTEM
+  elevation, based on required privileges rather than a list of example command names. Remove task-specific wording
+  from the skill and MCP instructions, and preserve the requested diagnostic, repair or modification scope.
+
 ## [1.2.2] - 2026-11-03
 
 ### Security

@@ -12,7 +12,7 @@ namespace NexusFree;
 public sealed class McpServer
 {
     public const string ServerName = "nexus-free";
-    public const string ServerVersion = "1.2.2";
+    public const string ServerVersion = "1.2.3";
     public static string? ConfiguredAgent { get; set; }
     public static string CurrentAgent { get; set; } = "antigravity";
     private static readonly HashSet<string> Protocols = ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"];
@@ -94,7 +94,7 @@ public sealed class McpServer
                         ["name"] = ServerName,
                         ["version"] = ServerVersion
                     },
-                    ["instructions"] = "Pour DISM (même écrit dsim), SFC et les commandes Windows nécessitant Administrateur / SYSTEM, utiliser directement free avec l’opération demandée, sans essai non élevé ni recherche préalable si la commande est connue. free_status sert au diagnostic d’un échec, pas de préalable systématique. SYSTEM a son propre profil : utiliser des chemins absolus. Un timeout d’attente n’arrête pas nécessairement la commande : vérifier son état avant de relancer."
+                    ["instructions"] = "Pour toute opération Windows nécessitant une élévation Administrateur / SYSTEM, utiliser directement free avec la commande, le binaire ou le script adapté à l’opération demandée. Ce routage dépend des privilèges nécessaires, pas d’une liste de noms de commandes. Aucun essai non élevé ni autre méthode d’élévation préalable. Vérifier la syntaxe seulement si nécessaire, puis exécuter via free. Respecter la portée demandée : diagnostic, réparation ou modification. free_status sert au diagnostic d’un échec, pas de préalable systématique. SYSTEM a son propre profil : utiliser des chemins absolus. Un timeout d’attente n’arrête pas nécessairement la commande : vérifier son état avant de relancer."
                 }
             };
         }
@@ -219,7 +219,7 @@ public sealed class McpServer
             new JsonObject
             {
                 ["name"] = "free",
-                ["description"] = "Voie directe pour DISM, SFC et toute commande Windows nécessitant Administrateur / SYSTEM, sans invite UAC (services, registre HKLM, réseau, installations). Exécute l’opération demandée ; aucun essai non élevé ni free_status préalable n’est nécessaire.",
+                ["description"] = "Voie directe pour toute commande, tout binaire ou script Windows nécessitant une élévation Administrateur / SYSTEM, sans invite UAC. Le choix dépend des privilèges requis, pas du nom de la commande. Exécute l’opération demandée ; aucun essai non élevé ni free_status préalable n’est nécessaire.",
                 ["inputSchema"] = new JsonObject
                 {
                     ["type"] = "object",

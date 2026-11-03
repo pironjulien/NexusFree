@@ -1,7 +1,7 @@
 {
   "name": "nexus-free",
   "displayName": "Nexus Free",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Administrator elevation and SYSTEM privileged execution without UAC friction for the Trinity (sfc, dism, services, registry, installations). Starts the native NexusFree engine installed by NexusSystem (or NexusFree's get.ps1).",
   "author": {
     "name": "Julien Piron",
