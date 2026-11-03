@@ -3,6 +3,17 @@
 All notable changes to the **NexusFree** product are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.1] - 2026-11-03
+
+### Changed
+- The skill, MCP initialization instructions and execution tool description route known DISM/SFC and elevated
+  Windows commands straight to `free`, without a redundant status call, failed unelevated attempt or web search.
+- Document SYSTEM's separate environment and that a client timeout does not necessarily cancel the command.
+
+### Security
+- The privileged dispatcher's diagnostic log no longer stores command text or exception messages that may contain
+  credentials or private arguments. Request IDs, exit codes and exception types remain available for diagnosis.
+
 ## [1.2.0] - 2026-11-03
 
 ### Added

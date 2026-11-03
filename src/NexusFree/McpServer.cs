@@ -12,7 +12,7 @@ namespace NexusFree;
 public sealed class McpServer
 {
     public const string ServerName = "nexus-free";
-    public const string ServerVersion = "1.2.0";
+    public const string ServerVersion = "1.2.1";
     public static string? ConfiguredAgent { get; set; }
     public static string CurrentAgent { get; set; } = "antigravity";
     private static readonly HashSet<string> Protocols = ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"];
@@ -93,7 +93,8 @@ public sealed class McpServer
                     {
                         ["name"] = ServerName,
                         ["version"] = ServerVersion
-                    }
+                    },
+                    ["instructions"] = "Pour DISM (même écrit dsim), SFC et les commandes Windows nécessitant Administrateur / SYSTEM, utiliser directement free avec l’opération demandée, sans essai non élevé ni recherche préalable si la commande est connue. free_status sert au diagnostic d’un échec, pas de préalable systématique. SYSTEM a son propre profil : utiliser des chemins absolus. Un timeout d’attente n’arrête pas nécessairement la commande : vérifier son état avant de relancer."
                 }
             };
         }
@@ -218,7 +219,7 @@ public sealed class McpServer
             new JsonObject
             {
                 ["name"] = "free",
-                ["description"] = "Exécute universellement toute commande réclamant des privilèges élevés Administrateur / SYSTEM sans invite UAC (diagnostics comme sfc/dism, gestion de services Windows, modifications registre HKLM, configurations réseau, installations, etc.).",
+                ["description"] = "Voie directe pour DISM, SFC et toute commande Windows nécessitant Administrateur / SYSTEM, sans invite UAC (services, registre HKLM, réseau, installations). Exécute l’opération demandée ; aucun essai non élevé ni free_status préalable n’est nécessaire.",
                 ["inputSchema"] = new JsonObject
                 {
                     ["type"] = "object",

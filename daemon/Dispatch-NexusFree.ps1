@@ -93,7 +93,8 @@ foreach ($item in $pending) {
             throw "Champ 'command' manquant ou vide."
         }
 
-        Write-BridgeLog "Exécution commande requête $id : $cmd" 'INFO'
+        # Never persist command arguments: they can contain credentials or private administrative data.
+        Write-BridgeLog "Exécution requête $id" 'INFO'
 
         $pwshExe = Get-Command pwsh.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
         if (-not $pwshExe) { $pwshExe = "$env:windir\System32\WindowsPowerShell\v1.0\powershell.exe" }
@@ -123,7 +124,7 @@ foreach ($item in $pending) {
         $success = $false
         $errorMsg = $_.Exception.Message
         $exitCode = 1
-        Write-BridgeLog "Erreur exécution requête $id : $errorMsg" 'ERROR'
+        Write-BridgeLog "Erreur exécution requête $id ($($_.Exception.GetType().Name))" 'ERROR'
     } finally {
         $finished = Get-Date
         $response = [ordered]@{
