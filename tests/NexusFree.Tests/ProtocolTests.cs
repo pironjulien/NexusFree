@@ -81,6 +81,7 @@ public class ProtocolTests
     [Fact]
     public async Task FreeStatus_ToolCall_Returns_Json_Status()
     {
+        Assert.Equal(TestEnvironment.JournalHome, Environment.GetEnvironmentVariable("NEXUS_JOURNAL_HOME"));
         var callReq = new JsonObject
         {
             ["jsonrpc"] = "2.0",
@@ -99,5 +100,8 @@ public class ProtocolTests
         Assert.NotEmpty(content);
         string text = content[0]?["text"]?.ToString() ?? "";
         Assert.Contains("taskName", text);
+        var journal = Path.Combine(TestEnvironment.JournalHome, "free", McpServer.CurrentAgent, $"{DateTime.UtcNow:yyyy-MM}.jsonl");
+        Assert.True(File.Exists(journal), "The real tool call must journal only inside the test host's temporary home.");
+        Assert.Contains(File.ReadLines(journal), line => JsonNode.Parse(line)?["action"]?.GetValue<string>() == "free_status");
     }
 }

@@ -3,6 +3,13 @@
 All notable changes to the **NexusFree** product are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- The test host isolates all journal writes in a temporary home, including the `free_status` protocol test.
+  Tests sharing global environment and static agent state run serially, so journal overrides cannot race or
+  append synthetic calls to the real user's history. Existing journals are left intact.
+
 ## [1.2.3] - 2026-11-03
 
 ### Changed
