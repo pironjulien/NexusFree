@@ -3,6 +3,13 @@
 All notable changes to the **NexusFree** product are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- Accents in the output of native programs that ignore `chcp 65001` without a console (`dism`, `netsh`...) are no
+  longer garbled: lines that are not valid UTF-8 are read in the system's OEM code page.
+- Cmdlet progress bars no longer leak into the output as a CLIXML block.
+
 ## [1.1.0] - 2026-11-03
 
 ### Security
