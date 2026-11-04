@@ -20,10 +20,6 @@ and Antigravity, after a single elevation at install time.
 
 </div>
 
-<div align="center">
-<a href="https://julienpiron.fr/nexusfree/"><img src="https://julienpiron.fr/nexusfree/assets/nexusfree-social.png" width="820" alt="NexusFree: administrator commands for your AI, without a UAC prompt"></a>
-</div>
-
 An agent working in the background cannot answer a UAC prompt, so `sfc`, `dism`, services, `HKLM` keys, drivers or
 installers fail. NexusFree runs those commands under `SYSTEM` for **one Windows account, the one that installed it**,
 after a single elevation at install time.
