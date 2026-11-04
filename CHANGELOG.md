@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- Same `.gitattributes` as every Nexus repository (2026-11-04): LF in Git and on disk, CRLF only for `.cmd`/`.bat`; files stored with CRLF were renormalized once.
+
 ### Fixed
 - The test host isolates all journal writes in a temporary home, including the `free_status` protocol test.
   Tests sharing global environment and static agent state run serially, so journal overrides cannot race or
