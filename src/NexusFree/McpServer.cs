@@ -12,7 +12,7 @@ namespace NexusFree;
 public sealed class McpServer
 {
     public const string ServerName = "nexus-free";
-    public const string ServerVersion = "1.2.4";
+    public const string ServerVersion = "1.2.5";
     public static string? ConfiguredAgent { get; set; }
     public static string CurrentAgent { get; set; } = "antigravity";
     private static readonly HashSet<string> Protocols = ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"];

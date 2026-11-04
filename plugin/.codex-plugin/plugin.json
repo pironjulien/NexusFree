@@ -1,6 +1,6 @@
 {
   "name": "nexus-free",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Administrator elevation and SYSTEM privileged execution without UAC friction for the Trinity (sfc, dism, services, registry, installations). Starts the native NexusFree engine installed by NexusSystem (or NexusFree's get.ps1).",
   "author": {
     "name": "Julien Piron",
@@ -20,7 +20,7 @@
   "mcpServers": "./.codex-mcp.json",
   "skills": "./skills/",
   "interface": {
-    "displayName": "Nexus Free",
+    "displayName": "NexusFree",
     "shortDescription": "Administrator and SYSTEM elevation without UAC friction",
     "developerName": "Julien Piron",
     "category": "Productivity",
