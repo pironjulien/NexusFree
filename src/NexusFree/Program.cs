@@ -26,7 +26,7 @@ public static class Program
         if (args.Contains("--status"))
         {
             var status = Engine.GetStatus();
-            Console.WriteLine(status.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+            Console.WriteLine(status.ToJsonString(Engine.ReadableJson));
             return 0;
         }
 
@@ -43,7 +43,7 @@ public static class Program
             return res.ExitCode;
         }
 
-        // Mode par défaut ou avec --mcp : serveur MCP stdio
+        // Default, or with --mcp: stdio MCP server
         await McpServer.RunStdioAsync();
         return 0;
     }

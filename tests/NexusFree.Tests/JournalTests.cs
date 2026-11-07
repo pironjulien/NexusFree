@@ -61,7 +61,7 @@ public class JournalTests
         {
             Journal.Write("antigravity", "free", "dism /online", "req-test-1", true, 0, 42.4, null);
 
-            string nowMonth = DateTime.UtcNow.ToString("yyyy-MM");
+            string nowMonth = DateTime.UtcNow.ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture);
             string expectedFile = Path.Combine(tempDir, "free", "antigravity", $"{nowMonth}.jsonl");
 
             Assert.True(File.Exists(expectedFile), $"Le fichier {expectedFile} doit exister.");

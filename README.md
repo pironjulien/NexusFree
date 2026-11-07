@@ -103,7 +103,7 @@ the [NexusSystem](https://github.com/pironjulien/NexusSystem) catalog; `install.
 flowchart LR
     A["AI agent"] -- "stdio (MCP)" --> E["NexusFree.exe (your account)"]
     E -- "request file" --> I["%ProgramData%\NexusFree\inbox"]
-    E -- "schtasks /run" --> T["SYSTEM task NexusFree"]
+    E -- "Task Scheduler API (run)" --> T["SYSTEM task NexusFree"]
     T --> D["Dispatch-NexusFree.ps1"]
     I --> D
     D -- "answer file" --> O["outbox"] --> E
@@ -113,7 +113,7 @@ flowchart LR
   `--version`.
 - **Dispatcher** (`daemon/Dispatch-NexusFree.ps1`), installed in `%ProgramFiles%\NexusFree`: the scheduled task's
   only action, under `SYSTEM`. It moves each request out of the inbox, checks that its file belongs to the authorized
-  account, runs it, and writes the answer to the outbox. Every command is logged in `logs\elevation.log`.
+  account, runs it, and writes the answer to the outbox (a temporary file renamed once complete). Every command is logged in `logs\elevation.log`; the engine removes answers nobody collected after 24 hours.
 
 <details>
 <summary><b>Access rights</b> (<code>daemon/setup-system.ps1</code>, by SID so any Windows language works)</summary>

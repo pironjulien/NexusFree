@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- French when Windows is in French, English otherwise: the MCP instructions, tool descriptions, results and errors
+  follow the Windows display language. The plugin guide is in English; Antigravity's copy is installed in French on a
+  French Windows (`fr/plugin/antigravity`).
+- The outbox cleans itself: answers nobody collected (arrived after the client's timeout, or kept as unreadable) are
+  removed after 24 hours, interrupted temporary answers after one hour.
+- `free_status` reports the task's last run and its result.
+
+### Changed
+- The engine reads and starts the SYSTEM task through the Task Scheduler API (COM `Schedule.Service`) instead of
+  running `schtasks.exe` and returning its localized CSV: `taskStatus` is now a state name (Ready, Running...).
+- Strict build: recommended .NET analyzers, code style enforced, warnings as errors (`.editorconfig` added).
+- Release workflow on NexusSystem's shared workflows v1.6.54, pinned by commit SHA.
+
 ### Fixed
 - A SYSTEM answer can no longer be lost. The dispatcher writes `<id>.json.tmp` and renames it to `<id>.json` in the
   same folder (atomic on one volume), so the client never sees a half-written answer. The client watches only the
@@ -103,3 +117,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Universal installation script `install.ps1 -Apply` with auto-bootstrap and plugin registration.
 - Multi-agent plugins for Google Antigravity, Claude Code, and OpenAI Codex.
 - Offline unit and protocol test suite (`tests/NexusFree.Tests`).
+
+[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.2.5...HEAD
+[1.2.5]: https://github.com/pironjulien/NexusFree/compare/v1.2.4...v1.2.5
+[1.2.4]: https://github.com/pironjulien/NexusFree/compare/v1.2.3...v1.2.4
+[1.2.3]: https://github.com/pironjulien/NexusFree/compare/v1.2.2...v1.2.3
+[1.2.2]: https://github.com/pironjulien/NexusFree/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/pironjulien/NexusFree/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/pironjulien/NexusFree/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/pironjulien/NexusFree/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/pironjulien/NexusFree/releases/tag/v1.0.0

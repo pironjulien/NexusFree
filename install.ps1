@@ -105,7 +105,11 @@ if ($Apply) {
     $agyPluginDir = Join-Path $env:USERPROFILE '.gemini\config\plugins\nexus-free'
     New-Item -ItemType Directory -Force -Path (Join-Path $agyPluginDir 'skills\nexus-free') | Out-Null
     Copy-Item -LiteralPath (Join-Path $pluginDir 'plugin.json'), (Join-Path $pluginDir 'logo.png') -Destination $agyPluginDir -Force
-    Copy-Item -LiteralPath (Join-Path $pluginDir 'skills\nexus-free\SKILL.md') -Destination (Join-Path $agyPluginDir 'skills\nexus-free') -Force
+    # Antigravity's guide in the Windows display language: French when Windows is in French, English otherwise.
+    $skill = Join-Path $pluginDir 'skills\nexus-free\SKILL.md'
+    $frenchSkill = Join-Path $PSScriptRoot 'fr\plugin\antigravity\skills\nexus-free\SKILL.md'
+    if ((Get-UICulture).TwoLetterISOLanguageName -eq 'fr' -and (Test-Path -LiteralPath $frenchSkill)) { $skill = $frenchSkill }
+    Copy-Item -LiteralPath $skill -Destination (Join-Path $agyPluginDir 'skills\nexus-free') -Force
     # Antigravity starts the command as written: the engine's absolute path for this account.
     $mcp = @{ mcpServers = @{ 'nexus-free' = @{ command = $exePath; args = @('--mcp') } } } | ConvertTo-Json -Depth 4
     [IO.File]::WriteAllText((Join-Path $agyPluginDir 'mcp_config.json'), $mcp, [Text.UTF8Encoding]::new($false))

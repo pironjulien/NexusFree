@@ -54,7 +54,7 @@ public static partial class Journal
     {
         if (string.IsNullOrWhiteSpace(command)) return null;
         var trimmed = command.Trim();
-        if (trimmed.StartsWith("& ")) trimmed = trimmed[2..].TrimStart();
+        if (trimmed.StartsWith("& ", StringComparison.Ordinal)) trimmed = trimmed[2..].TrimStart();
 
         string firstToken;
         if (trimmed.StartsWith('"'))
@@ -89,10 +89,12 @@ public static partial class Journal
         return "powershell.exe";
     }
 
+    private static readonly char[] LineBreaks = ['\r', '\n'];
+
     public static string? CleanError(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
-        var parts = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        var parts = text.Split(LineBreaks, StringSplitOptions.RemoveEmptyEntries);
         var firstLine = parts.Length > 0 ? parts[0].Trim() : text.Trim();
         var debut = CutRegex().Split(firstLine, 2)[0].Trim(' ', '.', ',', ';', '-');
         return debut.Length == 0 ? "error" : (debut.Length <= 80 ? debut : debut[..80]);

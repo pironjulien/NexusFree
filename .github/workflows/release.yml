@@ -70,7 +70,7 @@ jobs:
             if (-not (Test-Path "$out/NexusFree.exe")) { throw "$rid output incomplete." }
             Get-ChildItem $out -Filter *.pdb | Remove-Item
             Copy-Item install.ps1, LICENSE, README.md, SECURITY.md $out
-            Copy-Item daemon, plugin $out -Recurse
+            Copy-Item daemon, plugin, fr $out -Recurse
             Compress-Archive -Path "$out/*" -DestinationPath "dist/NexusFree-$rid.zip"
           }
           $version = & "$env:RUNNER_TEMP/publish-win-x64/NexusFree.exe" --version
@@ -92,7 +92,7 @@ jobs:
       contents: write
       id-token: write
       attestations: write
-    uses: pironjulien/NexusSystem/.github/workflows/product-dev-release.yml@9cf03f2ac93e207307351b393130ff1cfe2aef7b  # v1.6.40
+    uses: pironjulien/NexusSystem/.github/workflows/product-dev-release.yml@585aa435089995a78b7c3a4c457ba727c9f89840  # v1.6.54
     with:
       product: NexusFree
       version: ${{ needs.build.outputs.version }}
@@ -104,7 +104,7 @@ jobs:
     permissions:
       contents: write
       id-token: write
-    uses: pironjulien/NexusSystem/.github/workflows/product-promote.yml@9cf03f2ac93e207307351b393130ff1cfe2aef7b  # v1.6.40
+    uses: pironjulien/NexusSystem/.github/workflows/product-promote.yml@585aa435089995a78b7c3a4c457ba727c9f89840  # v1.6.54
     with:
       product: NexusFree
       promote: ${{ inputs.promote || needs.dev.outputs.tag }}

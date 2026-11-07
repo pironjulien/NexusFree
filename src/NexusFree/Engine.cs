@@ -1,11 +1,12 @@
 using System;
-using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 
 namespace NexusFree;
 
@@ -29,40 +30,33 @@ public sealed class Engine
     public static readonly string LogDir = Path.Combine(SpoolDir, "logs");
     public static readonly string LogFile = Path.Combine(LogDir, "elevation.log");
 
+    /// <summary>An answer nobody collected (it arrived after the client's timeout) is removed after this time.</summary>
+    internal static readonly TimeSpan AnswerLifetime = TimeSpan.FromHours(24);
+
+    /// <summary>A temporary answer lives milliseconds; one this old was left by an interrupted dispatcher.</summary>
+    internal static readonly TimeSpan TemporaryLifetime = TimeSpan.FromHours(1);
+
+    /// <summary>Status JSON as people read it (console and MCP text, never HTML): accents and "+" kept, not escaped.</summary>
+    internal static readonly JsonSerializerOptions ReadableJson = new() { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
     public static JsonObject GetStatus()
     {
         bool inboxReady = Directory.Exists(InboxDir);
         bool taskFound = false;
-        string taskStatus = "Inconnue";
+        string taskStatus;
+        JsonNode? lastRun = null, lastResult = null;
 
         try
         {
-            var psi = new ProcessStartInfo("schtasks.exe", $"/query /tn \"{TaskName}\" /fo csv /nh")
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-            using var p = Process.Start(psi);
-            if (p != null)
-            {
-                string output = p.StandardOutput.ReadToEnd();
-                p.WaitForExit();
-                if (p.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
-                {
-                    taskFound = true;
-                    taskStatus = output.Trim();
-                }
-                else
-                {
-                    taskStatus = "Non installée";
-                }
-            }
+            var task = SystemTask.Query(TaskName);
+            taskFound = task.Found;
+            taskStatus = task.Found ? Strings.TaskStateName(task.State) : Strings.TaskMissing;
+            if (task.LastRun is DateTime run) lastRun = new DateTimeOffset(DateTime.SpecifyKind(run, DateTimeKind.Local)).ToString("o", CultureInfo.InvariantCulture);
+            if (task.LastResult is int code) lastResult = code;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is COMException or UnauthorizedAccessException or InvalidOperationException or InvalidCastException or Microsoft.CSharp.RuntimeBinder.RuntimeBinderException)
         {
-            taskStatus = "Erreur: " + ex.Message;
+            taskStatus = Strings.TaskError(ex.Message);
         }
 
         return new JsonObject
@@ -70,6 +64,8 @@ public sealed class Engine
             ["installed"] = taskFound && inboxReady,
             ["taskName"] = TaskName,
             ["taskStatus"] = taskStatus,
+            ["lastRun"] = lastRun,
+            ["lastResult"] = lastResult,
             ["spoolDir"] = SpoolDir,
             ["inboxReady"] = inboxReady
         };
@@ -79,25 +75,15 @@ public sealed class Engine
     {
         if (string.IsNullOrWhiteSpace(command))
         {
-            return new CommandResult
-            {
-                Id = "none",
-                Success = false,
-                ExitCode = 1,
-                Error = "La commande à exécuter est vide."
-            };
+            return new CommandResult { Id = "none", Success = false, ExitCode = 1, Error = Strings.EmptyCommand };
         }
 
         if (!Directory.Exists(InboxDir))
         {
-            return new CommandResult
-            {
-                Id = "none",
-                Success = false,
-                ExitCode = 1,
-                Error = $"Sas NexusFree introuvable ({InboxDir}). Lancez install.ps1 une fois pour enregistrer la tâche SYSTEM."
-            };
+            return new CommandResult { Id = "none", Success = false, ExitCode = 1, Error = Strings.SpoolMissing(InboxDir) };
         }
+
+        PruneOutbox(OutboxDir, DateTime.UtcNow);
 
         string id = "req-" + Guid.NewGuid().ToString("N");
         string inFile = Path.Combine(InboxDir, $"{id}.json");
@@ -107,42 +93,54 @@ public sealed class Engine
         {
             ["id"] = id,
             ["command"] = command,
-            ["created"] = DateTime.UtcNow.ToString("o")
+            ["created"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture)
         };
 
         await File.WriteAllTextAsync(inFile, reqObj.ToJsonString(), Encoding.UTF8, ct);
 
-        // Déclencher la tâche planifiée SYSTEM
+        // Start the SYSTEM scheduled task.
         try
         {
-            var psi = new ProcessStartInfo("schtasks.exe", $"/run /tn \"{TaskName}\"")
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-            using var p = Process.Start(psi);
-            if (p != null)
-            {
-                await p.WaitForExitAsync(ct);
-            }
+            SystemTask.Run(TaskName);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is COMException or UnauthorizedAccessException or InvalidOperationException or InvalidCastException or Microsoft.CSharp.RuntimeBinder.RuntimeBinderException)
         {
-            try { File.Delete(inFile); } catch { }
-            return new CommandResult
-            {
-                Id = id,
-                Success = false,
-                ExitCode = 1,
-                Error = $"Échec du déclenchement de la tâche '{TaskName}': {ex.Message}"
-            };
+            try { File.Delete(inFile); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            return new CommandResult { Id = id, Success = false, ExitCode = 1, Error = Strings.TriggerFailed(TaskName, ex.Message) };
         }
 
         return await WaitForResultAsync(outFile, id, TimeSpan.FromSeconds(timeoutSeconds), ct);
     }
 
+    /// <summary>
+    /// Removes what no client will ever read from the outbox: answers older than <see cref="AnswerLifetime"/> (they
+    /// arrived after their client gave up, or were kept as unreadable for diagnosis) and temporary answers older than
+    /// <see cref="TemporaryLifetime"/> (an interrupted write). Best effort: a locked or protected file stays for the
+    /// next run. Returns how many files were removed.
+    /// </summary>
+    internal static int PruneOutbox(string outboxDir, DateTime nowUtc)
+    {
+        int removed = 0;
+        IEnumerable<string> files;
+        try { files = Directory.EnumerateFiles(outboxDir, "req-*"); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return 0; }
+
+        foreach (string file in files)
+        {
+            TimeSpan lifetime;
+            if (file.EndsWith(".json.tmp", StringComparison.OrdinalIgnoreCase)) lifetime = TemporaryLifetime;
+            else if (file.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) lifetime = AnswerLifetime;
+            else continue;
+            try
+            {
+                if (nowUtc - File.GetLastWriteTimeUtc(file) < lifetime) continue;
+                File.Delete(file);
+                removed++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
+        return removed;
+    }
     /// <summary>
     /// Waits for the dispatcher's answer <paramref name="outFile"/> and returns it once it parses. The dispatcher writes
     /// <c>&lt;id&gt;.json.tmp</c> then renames it, so only the final name is watched; a file that does not parse yet
@@ -184,7 +182,7 @@ public sealed class Engine
                             try { File.Delete(outFile); } catch (IOException) { } catch (UnauthorizedAccessException) { }
                             return result;
                         }
-                        lastProblem = "réponse JSON qui n'est pas un objet";
+                        lastProblem = Strings.NotAnObject;
                     }
                     catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or InvalidOperationException or FormatException)
                     {
@@ -206,19 +204,17 @@ public sealed class Engine
                 Id = id,
                 Success = false,
                 ExitCode = 130,
-                Error = "Opération annulée."
+                Error = Strings.Cancelled
             };
         }
 
-        string detail = lastProblem.Length > 0
-            ? $" La réponse {outFile} est restée illisible ({lastProblem}) ; elle est conservée pour diagnostic."
-            : "";
+        string detail = lastProblem.Length > 0 ? Strings.Unreadable(outFile, lastProblem) : "";
         return new CommandResult
         {
             Id = id,
             Success = false,
             ExitCode = 124,
-            Error = $"Délai dépassé ({timeout.TotalSeconds:0.###}s) sans réponse de la tâche SYSTEM pour la requête {id}.{detail}"
+            Error = Strings.TimedOut(timeout.TotalSeconds, id, detail)
         };
     }
 

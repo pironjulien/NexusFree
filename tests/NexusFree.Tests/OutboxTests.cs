@@ -55,7 +55,7 @@ public sealed class OutboxTests : IDisposable
 
         Assert.False(result.Success);
         Assert.Equal(124, result.ExitCode);
-        Assert.Contains("illisible", result.Error);
+        Assert.Contains(OutFile, result.Error, StringComparison.Ordinal); // the kept answer is named in either language
         Assert.True(File.Exists(OutFile));
     }
 

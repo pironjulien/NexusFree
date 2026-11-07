@@ -94,7 +94,7 @@ public sealed class McpServer
                         ["name"] = ServerName,
                         ["version"] = ServerVersion
                     },
-                    ["instructions"] = "Pour toute opération Windows nécessitant une élévation Administrateur / SYSTEM, utiliser directement free avec la commande, le binaire ou le script adapté à l’opération demandée. Ce routage dépend des privilèges nécessaires, pas d’une liste de noms de commandes. Aucun essai non élevé ni autre méthode d’élévation préalable. Vérifier la syntaxe seulement si nécessaire, puis exécuter via free. Respecter la portée demandée : diagnostic, réparation ou modification. free_status sert au diagnostic d’un échec, pas de préalable systématique. SYSTEM a son propre profil : utiliser des chemins absolus. Un timeout d’attente n’arrête pas nécessairement la commande : vérifier son état avant de relancer."
+                    ["instructions"] = Strings.Instructions
                 }
             };
         }
@@ -144,14 +144,14 @@ public sealed class McpServer
                     isError = !res.Success;
 
                     var sb = new StringBuilder();
-                    sb.AppendLine($"[NexusFree] Code de sortie : {res.ExitCode}");
+                    sb.AppendLine(Strings.ExitCodeLine(res.ExitCode));
                     if (!string.IsNullOrWhiteSpace(res.Output))
                     {
                         sb.AppendLine(res.Output.TrimEnd());
                     }
                     if (!string.IsNullOrWhiteSpace(res.Error))
                     {
-                        sb.AppendLine($"[Erreur] {res.Error.TrimEnd()}");
+                        sb.AppendLine(Strings.ErrorLine(res.Error.TrimEnd()));
                     }
                     resultText = sb.ToString();
 
@@ -161,7 +161,7 @@ public sealed class McpServer
                 {
                     var status = Engine.GetStatus();
                     sw.Stop();
-                    resultText = status.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+                    resultText = status.ToJsonString(Engine.ReadableJson);
                     bool installed = status["installed"]?.GetValue<bool>() ?? false;
                     Journal.Write(CurrentAgent, "free_status", null, null, installed, installed ? 0 : 1, sw.Elapsed.TotalMilliseconds, null);
                 }
@@ -169,15 +169,15 @@ public sealed class McpServer
                 {
                     sw.Stop();
                     isError = true;
-                    resultText = $"Outil inconnu : {toolName}";
-                    Journal.Write(CurrentAgent, toolName, null, null, false, 1, sw.Elapsed.TotalMilliseconds, "Outil inconnu");
+                    resultText = Strings.UnknownTool(toolName);
+                    Journal.Write(CurrentAgent, toolName, null, null, false, 1, sw.Elapsed.TotalMilliseconds, "Unknown tool");
                 }
             }
             catch (Exception ex)
             {
                 sw.Stop();
                 isError = true;
-                resultText = $"Erreur d'exécution de l'outil {toolName} : {ex.Message}";
+                resultText = Strings.ToolFailed(toolName, ex.Message);
                 Journal.Write(CurrentAgent, toolName, null, null, false, 1, sw.Elapsed.TotalMilliseconds, ex.Message);
             }
 
@@ -207,7 +207,7 @@ public sealed class McpServer
             ["error"] = new JsonObject
             {
                 ["code"] = -32601,
-                ["message"] = $"Méthode non supportée : {method}"
+                ["message"] = Strings.UnsupportedMethod(method)
             }
         };
     }
@@ -219,7 +219,7 @@ public sealed class McpServer
             new JsonObject
             {
                 ["name"] = "free",
-                ["description"] = "Voie directe pour toute commande, tout binaire ou script Windows nécessitant une élévation Administrateur / SYSTEM, sans invite UAC. Le choix dépend des privilèges requis, pas du nom de la commande. Exécute l’opération demandée ; aucun essai non élevé ni free_status préalable n’est nécessaire.",
+                ["description"] = Strings.FreeDescription,
                 ["inputSchema"] = new JsonObject
                 {
                     ["type"] = "object",
@@ -228,12 +228,12 @@ public sealed class McpServer
                         ["command"] = new JsonObject
                         {
                             ["type"] = "string",
-                            ["description"] = "La commande shell ou PowerShell à exécuter avec élévation SYSTEM."
+                            ["description"] = Strings.CommandDescription
                         },
                         ["timeout_seconds"] = new JsonObject
                         {
                             ["type"] = "integer",
-                            ["description"] = "Délai maximal d'attente en secondes (par défaut : 600)."
+                            ["description"] = Strings.TimeoutDescription
                         }
                     },
                     ["required"] = new JsonArray { "command" }
@@ -242,7 +242,7 @@ public sealed class McpServer
             new JsonObject
             {
                 ["name"] = "free_status",
-                ["description"] = "Vérifie l'état opérationnel du pont d'élévation NexusFree (tâche SYSTEM, sas, communication).",
+                ["description"] = Strings.StatusDescription,
                 ["inputSchema"] = new JsonObject
                 {
                     ["type"] = "object",
