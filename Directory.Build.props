@@ -1,9 +1,11 @@
 <Project>
-  <!-- Builds and test outputs outside OneDrive: %USERPROFILE%\.nexus\build\nexusfree\<project>. -->
+  <!-- Build and test outputs outside OneDrive: ~/.nexus/build/nexusfree/<project>.
+       The user profile comes from .NET, not $(USERPROFILE): Dependabot restores on Linux, where USERPROFILE is unset
+       and '\.nexus' at the file system root is denied, so its NuGet updates would silently find nothing. -->
   <PropertyGroup>
-    <NexusFreeBuild>$(USERPROFILE)\.nexus\build\nexusfree\$(MSBuildProjectName)\</NexusFreeBuild>
-    <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)' == ''">$(NexusFreeBuild)obj\</BaseIntermediateOutputPath>
-    <BaseOutputPath Condition="'$(BaseOutputPath)' == ''">$(NexusFreeBuild)bin\</BaseOutputPath>
+    <NexusFreeBuild>$([System.IO.Path]::Combine($([System.Environment]::GetFolderPath(SpecialFolder.UserProfile)), '.nexus', 'build', 'nexusfree', '$(MSBuildProjectName)'))$([System.IO.Path]::DirectorySeparatorChar)</NexusFreeBuild>
+    <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)' == ''">$([System.IO.Path]::Combine('$(NexusFreeBuild)', 'obj'))$([System.IO.Path]::DirectorySeparatorChar)</BaseIntermediateOutputPath>
+    <BaseOutputPath Condition="'$(BaseOutputPath)' == ''">$([System.IO.Path]::Combine('$(NexusFreeBuild)', 'bin'))$([System.IO.Path]::DirectorySeparatorChar)</BaseOutputPath>
   </PropertyGroup>
   <!-- Strict build: the recommended .NET analyzers and the code style rules of .editorconfig, every warning an error. -->
   <PropertyGroup>
