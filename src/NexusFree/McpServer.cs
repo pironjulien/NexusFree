@@ -12,7 +12,7 @@ namespace NexusFree;
 public sealed class McpServer
 {
     public const string ServerName = "nexus-free";
-    public const string ServerVersion = "1.3.2";
+    public const string ServerVersion = "1.3.3";
     public static string? ConfiguredAgent { get; set; }
     public static string CurrentAgent { get; set; } = "antigravity";
     private static readonly HashSet<string> Protocols = ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"];
@@ -177,7 +177,8 @@ public sealed class McpServer
             {
                 sw.Stop();
                 isError = true;
-                resultText = Strings.ToolFailed(toolName, ex.Message);
+                string? replacedBy = SelfImage.ReplacedBy();
+                resultText = replacedBy is null ? Strings.ToolFailed(toolName, ex.Message) : Strings.UpdatedWhileOpen(toolName, replacedBy, ex.Message);
                 Journal.Write(CurrentAgent, toolName, null, null, false, 1, sw.Elapsed.TotalMilliseconds, ex.Message);
             }
 

@@ -5,6 +5,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-11-07
+
+### Fixed
+- An AI session opened before an update keeps working after it. The update renames the running engine aside and
+  copies the new one to the same path; a self-contained single-file engine loads each assembly from its own path the
+  first time it needs it, so it then read the new version's bytes and every later `free` or `free_status` call of that
+  session failed with an empty error ("Tool free failed: "), `whoami` included, while sessions started after the update
+  worked. The MCP server and the SYSTEM dispatcher now load every assembly they reference as soon as they start, while
+  the file is still theirs (about 8 ms). Should a call still fail after its file was replaced, the error says that
+  NexusFree was updated while the session was open and to reconnect the nexus-free MCP server.
+- `get.ps1` no longer fails now and then with "The package does not start on this PC" under Windows PowerShell 5.1:
+  it read only the first line of `NexusFree.exe --version` through `Select-Object -First 1`, which stops the program
+  early there, so its exit code read -1. The whole output is read, then its first line.
+- Sessions opened before this update still run an engine without that fix: reconnect their nexus-free server (or open
+  a new session) once after updating to 1.3.3.
+
+### Added
+- A test that starts the self-contained single-file build, replaces its file the way install.ps1 does, and checks that
+  its tools still answer.
+
 ## [1.3.2] - 2026-11-07
 
 ### Fixed
@@ -154,7 +174,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Multi-agent plugins for Google Antigravity, Claude Code, and OpenAI Codex.
 - Offline unit and protocol test suite (`tests/NexusFree.Tests`).
 
-[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.3.2...HEAD
+[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.3.3...HEAD
+[1.3.3]: https://github.com/pironjulien/NexusFree/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/pironjulien/NexusFree/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/pironjulien/NexusFree/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/pironjulien/NexusFree/compare/v1.2.5...v1.3.0

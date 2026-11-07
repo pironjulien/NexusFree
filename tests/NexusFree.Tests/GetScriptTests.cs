@@ -28,7 +28,7 @@ public sealed class GetScriptTests : IDisposable
 
     // The build output lives outside the repository: the repository is found from this source file, or (a CI build
     // maps source paths) from the folder test.ps1 runs in.
-    private static string Repository([CallerFilePath] string source = "")
+    internal static string Repository([CallerFilePath] string source = "")
     {
         foreach (string start in new[] { Path.Join(Path.GetDirectoryName(source) ?? "", "..", ".."), Environment.CurrentDirectory, Environment.GetEnvironmentVariable("GITHUB_WORKSPACE") ?? "" })
         {
@@ -67,7 +67,8 @@ public sealed class GetScriptTests : IDisposable
         var (code, output) = Get(shell);
         Assert.True(code == 0, output);
         Assert.True(File.Exists(Path.Join(Home, "releases", McpServer.ServerVersion, "NexusFree.exe")), output);
-        Assert.True(Get(shell).Code == 0, "a second run (update) must succeed");
+        var (again, againOutput) = Get(shell);
+        Assert.True(again == 0, "a second run (update) must succeed: " + againOutput);
         Assert.Single(Directory.GetDirectories(Path.Join(Home, "releases")));
         Assert.Empty(Directory.GetDirectories(Home, "staging-*"));
     }

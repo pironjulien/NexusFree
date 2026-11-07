@@ -124,7 +124,10 @@ try {
     if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
     Move-StagedFolder $staged $target
     # Run once in place: the package must start on this PC's architecture and report the version it carries.
-    $answer = (& (Join-Path $target 'NexusFree.exe') --version | Select-Object -First 1) -replace '^NexusFree v(\S+).*$', '$1'
+    # Its whole output first: Select-Object -First in the pipeline stops a native program early in Windows PowerShell,
+    # whose exit code then reads -1.
+    $output = @(& (Join-Path $target 'NexusFree.exe') --version)
+    $answer = "$($output | Select-Object -First 1)" -replace '^NexusFree v(\S+).*$', '$1'
     if ($LASTEXITCODE -or $answer -ne $version) {
         Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
         throw 'The package does not start on this PC.'

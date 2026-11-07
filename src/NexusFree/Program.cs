@@ -11,6 +11,7 @@ public static class Program
         // The SYSTEM task's action: answers the spool's requests. First, before anything writes to a user profile.
         if (args.Contains("--dispatch"))
         {
+            SelfImage.Pin(); // an update may replace this very file while it runs (setup-system.ps1 sent through NexusFree)
             return await Dispatcher.RunInstalledAsync();
         }
 
@@ -40,6 +41,7 @@ public static class Program
         if (execIndex >= 0 && execIndex + 1 < args.Length)
         {
             string cmd = args[execIndex + 1];
+            SelfImage.Pin();
             var res = await Engine.ExecuteAsync(cmd);
             Console.WriteLine(res.Output);
             if (!string.IsNullOrWhiteSpace(res.Error))
@@ -49,7 +51,8 @@ public static class Program
             return res.ExitCode;
         }
 
-        // Default, or with --mcp: stdio MCP server
+        // Default, or with --mcp: stdio MCP server, which lives as long as its AI session, updates included.
+        SelfImage.Pin();
         await McpServer.RunStdioAsync();
         return 0;
     }
