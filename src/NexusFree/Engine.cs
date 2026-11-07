@@ -166,7 +166,11 @@ public sealed class Engine
                 {
                     try
                     {
-                        string raw = await File.ReadAllTextAsync(outFile, Encoding.UTF8, ct);
+                        // Shared for writing and deleting: reading never makes a writer still filling the answer fail.
+                        string raw;
+                        using (var stream = new FileStream(outFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.Asynchronous))
+                        using (var reader = new StreamReader(stream, Encoding.UTF8))
+                            raw = await reader.ReadToEndAsync(ct);
                         if (JsonNode.Parse(raw) is JsonObject node)
                         {
                             var result = new CommandResult

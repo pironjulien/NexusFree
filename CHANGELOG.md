@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `get.ps1` works under Windows PowerShell started from PowerShell 7 or from a .NET process that inherited its
   module folders (NexusSystem's maintenance run by hand): it keeps only Windows PowerShell's own module folders, so
   `Get-FileHash` loads again, as in the other Nexus products.
+- Reading an answer no longer locks it: the engine opens it shared for writing and deleting, so a dispatcher still
+  writing it in place never fails with a sharing violation (it is read again until it parses).
 
 ## [1.3.0] - 2026-11-07
 
