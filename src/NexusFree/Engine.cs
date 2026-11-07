@@ -140,35 +140,38 @@ public sealed class Engine
             };
         }
 
-        DateTime deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+        return await WaitForResultAsync(outFile, id, TimeSpan.FromSeconds(timeoutSeconds), ct);
+    }
 
-        while (DateTime.UtcNow < deadline)
+    /// <summary>
+    /// Waits for the dispatcher's answer <paramref name="outFile"/> and returns it once it parses. The dispatcher writes
+    /// <c>&lt;id&gt;.json.tmp</c> then renames it, so only the final name is watched; a file that does not parse yet
+    /// (an older dispatcher still writing it in place) or is locked is read again until the deadline, and is deleted
+    /// only after a successful parse, so an answer is never lost. A FileSystemWatcher wakes the wait at once; polling
+    /// stays as the fallback for missed or overflowing notifications.
+    /// </summary>
+    internal static async Task<CommandResult> WaitForResultAsync(string outFile, string id, TimeSpan timeout, CancellationToken ct)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        using var signal = new SemaphoreSlim(0);
+        using var watcher = CreateWatcher(outFile, signal);
+        string lastProblem = "";
+
+        try
         {
-            if (ct.IsCancellationRequested)
+            while (true)
             {
-                return new CommandResult
-                {
-                    Id = id,
-                    Success = false,
-                    ExitCode = 130,
-                    Error = "Opération annulée."
-                };
-            }
+                ct.ThrowIfCancellationRequested();
 
-            if (File.Exists(outFile))
-            {
-                await Task.Delay(100, ct);
-                for (int attempt = 0; attempt < 10; attempt++)
+                bool retryingSoon = false;
+                if (File.Exists(outFile))
                 {
                     try
                     {
                         string raw = await File.ReadAllTextAsync(outFile, Encoding.UTF8, ct);
-                        try { File.Delete(outFile); } catch { }
-
-                        var node = JsonNode.Parse(raw) as JsonObject;
-                        if (node != null)
+                        if (JsonNode.Parse(raw) is JsonObject node)
                         {
-                            return new CommandResult
+                            var result = new CommandResult
                             {
                                 Id = node["id"]?.ToString() ?? id,
                                 Success = node["success"]?.GetValue<bool>() ?? false,
@@ -178,24 +181,71 @@ public sealed class Engine
                                 Started = node["started"]?.ToString() ?? "",
                                 Finished = node["finished"]?.ToString() ?? ""
                             };
+                            try { File.Delete(outFile); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+                            return result;
                         }
+                        lastProblem = "réponse JSON qui n'est pas un objet";
                     }
-                    catch (IOException)
+                    catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or InvalidOperationException or FormatException)
                     {
-                        await Task.Delay(200, ct);
+                        lastProblem = ex.GetType().Name + ": " + ex.Message;
                     }
+                    retryingSoon = true;
                 }
-            }
 
-            await Task.Delay(250, ct);
+                TimeSpan remaining = deadline - DateTime.UtcNow;
+                if (remaining <= TimeSpan.Zero) break;
+                TimeSpan pollInterval = retryingSoon ? TimeSpan.FromMilliseconds(100) : TimeSpan.FromMilliseconds(500);
+                await signal.WaitAsync(remaining < pollInterval ? remaining : pollInterval, ct);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return new CommandResult
+            {
+                Id = id,
+                Success = false,
+                ExitCode = 130,
+                Error = "Opération annulée."
+            };
         }
 
+        string detail = lastProblem.Length > 0
+            ? $" La réponse {outFile} est restée illisible ({lastProblem}) ; elle est conservée pour diagnostic."
+            : "";
         return new CommandResult
         {
             Id = id,
             Success = false,
             ExitCode = 124,
-            Error = $"Délai dépassé ({timeoutSeconds}s) sans réponse de la tâche SYSTEM pour la requête {id}."
+            Error = $"Délai dépassé ({timeout.TotalSeconds:0.###}s) sans réponse de la tâche SYSTEM pour la requête {id}.{detail}"
         };
+    }
+
+    private static FileSystemWatcher? CreateWatcher(string outFile, SemaphoreSlim signal)
+    {
+        try
+        {
+            string? directory = Path.GetDirectoryName(outFile);
+            if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory)) return null;
+            var watcher = new FileSystemWatcher(directory, Path.GetFileName(outFile))
+            {
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size
+            };
+            void Wake(object? sender, EventArgs e)
+            {
+                if (signal.CurrentCount == 0) { try { signal.Release(); } catch (ObjectDisposedException) { } catch (SemaphoreFullException) { } }
+            }
+            watcher.Created += Wake;
+            watcher.Changed += Wake;
+            watcher.Renamed += Wake;
+            watcher.Error += Wake;
+            watcher.EnableRaisingEvents = true;
+            return watcher;
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return null; // Polling alone still finds the answer.
+        }
     }
 }

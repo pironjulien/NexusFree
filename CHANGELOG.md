@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- A SYSTEM answer can no longer be lost. The dispatcher writes `<id>.json.tmp` and renames it to `<id>.json` in the
+  same folder (atomic on one volume), so the client never sees a half-written answer. The client watches only the
+  final file with a `FileSystemWatcher` (polling kept as the fallback), parses it before deleting it, and reads it
+  again on `JsonException` or `IOException` until the timeout; an answer that never parses is kept for diagnosis and
+  named in the timeout error.
+
 ## [1.2.5] - 2026-11-04
 
 ### Changed

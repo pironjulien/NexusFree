@@ -136,7 +136,16 @@ foreach ($item in $pending) {
             started   = $started.ToString('o')
             finished  = $finished.ToString('o')
         }
-        $response | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $targetOutbox -Encoding utf8
+        # Written under a temporary name, then renamed in the same folder (an atomic rename on one volume): the
+        # client only watches <id>.json, so it never reads a half-written answer.
+        $tempOutbox = "$targetOutbox.tmp"
+        try {
+            $response | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $tempOutbox -Encoding utf8
+            [IO.File]::Move($tempOutbox, $targetOutbox)
+        } catch {
+            Write-BridgeLog "Échec écriture réponse $id ($($_.Exception.GetType().Name)): $($_.Exception.Message)" 'ERROR'
+            Remove-Item -LiteralPath $tempOutbox -Force -ErrorAction SilentlyContinue
+        }
         Remove-Item -LiteralPath $targetStaging -Force -ErrorAction SilentlyContinue
     }
 }

@@ -9,4 +9,7 @@
     <RootNamespace>NexusFree</RootNamespace>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="NexusFree.Tests" />
+  </ItemGroup>
 </Project>
