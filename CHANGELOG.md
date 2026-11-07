@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Tests: no test can show a Windows error box. The test process sets the error mode (no critical-error, crash or
   missing-file box) when it loads, and every process it starts inherits it; a test checks it in a child process.
+- Tests: the update-while-running test no longer fails when a scanner briefly opens the engine it has just written
+  and started. Only that transient sharing hold is waited out (at most 10 s, as `get.ps1` does); a longer hold fails
+  and names the processes holding the file (Restart Manager).
 
 ## [1.3.4] - 2026-11-07
 

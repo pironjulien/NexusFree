@@ -35,6 +35,91 @@ public sealed class UpdateWhileRunningTests : IDisposable
         return Path.Join(output, "NexusFree.exe");
     }
 
+    /// <summary>
+    /// install.ps1 renames an engine that has run for a while. Here the file was written and started seconds ago, and
+    /// antivirus or indexing services open a freshly written executable for a moment to scan it without sharing delete:
+    /// the rename then fails with "being used by another process" (the Release run of d411487), while the engine itself
+    /// holds nothing that forbids it. Only that external, transient hold (a sharing or lock violation) is waited out, at
+    /// most 10 s, as get.ps1 does for its staged folder; a longer hold fails and names the processes holding the file.
+    /// </summary>
+    private static void MoveAsideOnceReleased(string path, string destination)
+    {
+        var elapsed = Stopwatch.StartNew();
+        while (true)
+        {
+            try
+            {
+                File.Move(path, destination);
+                return;
+            }
+            catch (IOException ex) when ((ex.HResult & 0xFFFF) is 32 or 33) // ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION
+            {
+                if (elapsed.Elapsed >= TimeSpan.FromSeconds(10))
+                    throw new IOException($"{path} is still held after 10 s by: {string.Join(", ", Holders(path))}", ex);
+                Thread.Sleep(100);
+            }
+        }
+    }
+
+    /// <summary>The processes that have <paramref name="path"/> open, as the Restart Manager sees them.</summary>
+    private static string[] Holders(string path)
+    {
+        if (RmStartSession(out uint session, 0, Guid.NewGuid().ToString("N")) != 0) return ["(Restart Manager unavailable)"];
+        try
+        {
+            if (RmRegisterResources(session, 1, [path], 0, IntPtr.Zero, 0, null) != 0) return ["(Restart Manager refused the file)"];
+            uint count = 0;
+            var processes = Array.Empty<RmProcessInfo>();
+            int result;
+            do
+            {
+                processes = new RmProcessInfo[count];
+                result = RmGetList(session, out uint needed, ref count, processes, out _);
+                count = needed;
+            } while (result == 234); // ERROR_MORE_DATA
+            if (result != 0) return [$"(Restart Manager error {result})"];
+            var names = processes.Take((int)count).Select(p => $"{p.AppName} (pid {p.Process.ProcessId})").ToArray();
+            return names.Length > 0 ? names : ["(no process listed)"];
+        }
+        finally { _ = RmEndSession(session); }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RmUniqueProcess
+    {
+        public int ProcessId;
+        public System.Runtime.InteropServices.ComTypes.FILETIME StartTime;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct RmProcessInfo
+    {
+        public RmUniqueProcess Process;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] public string AppName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] public string ServiceShortName;
+        public int ApplicationType;
+        public uint AppStatus;
+        public uint TSSessionId;
+        [MarshalAs(UnmanagedType.Bool)] public bool Restartable;
+    }
+
+    [DllImport("rstrtmgr.dll", CharSet = CharSet.Unicode)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    private static extern int RmStartSession(out uint session, int flags, string key);
+
+    [DllImport("rstrtmgr.dll", CharSet = CharSet.Unicode)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    private static extern int RmRegisterResources(uint session, uint fileCount, string[] files, uint applicationCount,
+        IntPtr applications, uint serviceCount, string[]? services);
+
+    [DllImport("rstrtmgr.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    private static extern int RmGetList(uint session, out uint needed, ref uint count, [In, Out] RmProcessInfo[] processes, out uint rebootReasons);
+
+    [DllImport("rstrtmgr.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    private static extern int RmEndSession(uint session);
+
     [Fact]
     public async Task A_running_engine_keeps_answering_after_its_file_is_replaced()
     {
@@ -64,7 +149,7 @@ public sealed class UpdateWhileRunningTests : IDisposable
 
             // What install.ps1 does to an engine in use: renamed aside, the new version copied to its path. Here the
             // "new version" is unrelated bytes: anything read from that path now is wrong.
-            File.Move(engine, engine + ".old-test");
+            MoveAsideOnceReleased(engine, engine + ".old-test");
             var junk = new byte[4 * 1024 * 1024];
             Random.Shared.NextBytes(junk);
             await File.WriteAllBytesAsync(engine, junk, TestContext.Current.CancellationToken);
