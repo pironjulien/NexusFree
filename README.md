@@ -11,6 +11,7 @@ and Antigravity, after a single elevation at install time.
 
 [![Tests](https://github.com/pironjulien/NexusFree/actions/workflows/tests.yml/badge.svg)](https://github.com/pironjulien/NexusFree/actions/workflows/tests.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/pironjulien/NexusFree/badge)](https://scorecard.dev/viewer/?uri=github.com/pironjulien/NexusFree)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16437/badge)](https://www.bestpractices.dev/projects/16437)
 [![release](https://img.shields.io/github/v/release/pironjulien/NexusFree?style=flat-square&label=release)](https://github.com/pironjulien/NexusFree/releases/latest)
 [![Windows 10 | 11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat-square)](#-install)
 [![MCP](https://img.shields.io/badge/MCP-stdio-6E56CF?style=flat-square)](#-tools)
