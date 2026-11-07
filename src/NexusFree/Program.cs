@@ -8,6 +8,12 @@ public static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        // The SYSTEM task's action: answers the spool's requests. First, before anything writes to a user profile.
+        if (args.Contains("--dispatch"))
+        {
+            return await Dispatcher.RunInstalledAsync();
+        }
+
         int agentIndex = Array.IndexOf(args, "--agent");
         if (agentIndex >= 0 && agentIndex + 1 < args.Length)
         {

@@ -80,15 +80,5 @@ public sealed class PruneAndLanguageTests : IDisposable
         Assert.False(info.Found);
     }
 
-    public void Dispose()
-    {
-        try
-        {
-            Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(_dir,
-                Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
-                Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin,
-                Microsoft.VisualBasic.FileIO.UICancelOption.DoNothing);
-        }
-        catch (Exception) { } // Keep the fixture when recycling is unavailable; never delete permanently.
-    }
+    public void Dispose() => TestEnvironment.DeleteOwnTemporary(_dir);
 }

@@ -18,9 +18,9 @@ public issue. Include your Windows version, the account types involved and the s
   `%ProgramData%`): only `SYSTEM`, Administrators and the authorized account can write requests or read answers, and
   only they can start the task. The dispatcher also refuses a request whose file is not owned by the authorized
   account, Administrators or `SYSTEM`.
-- **Logs:** every command line is written to `%ProgramData%\NexusFree\logs\elevation.log`. Do not pass secrets on the
-  command line.
-- **Updates:** `install.ps1 -Apply` sent through an installed NexusFree replaces the dispatcher under `SYSTEM`; run it
+- **Logs:** every request is recorded in `%ProgramData%\NexusFree\logs\elevation.log` by its id and exit code, never its
+  command; the AI app's own transcript keeps the command, so do not pass secrets on the command line.
+- **Updates:** `install.ps1 -Apply` sent through an installed NexusFree replaces the dispatcher (`%ProgramFiles%\NexusFree\NexusFree.exe`) under `SYSTEM`; run it
   only from a copy you trust (a release whose files match its `SHA256SUMS.txt` and build attestation, or the
   repository).
 

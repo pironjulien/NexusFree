@@ -104,23 +104,23 @@ flowchart LR
     A["AI agent"] -- "stdio (MCP)" --> E["NexusFree.exe (your account)"]
     E -- "request file" --> I["%ProgramData%\NexusFree\inbox"]
     E -- "Task Scheduler API (run)" --> T["SYSTEM task NexusFree"]
-    T --> D["Dispatch-NexusFree.ps1"]
+    T --> D["NexusFree.exe --dispatch (SYSTEM)"]
     I --> D
     D -- "answer file" --> O["outbox"] --> E
 ```
 
 - **Engine** (`src/NexusFree`): native C# (.NET 10) stdio MCP server, also `--status`, `--exec "<command>"` and
-  `--version`.
-- **Dispatcher** (`daemon/Dispatch-NexusFree.ps1`), installed in `%ProgramFiles%\NexusFree`: the scheduled task's
+  `--version` (and `--dispatch`, the SYSTEM side).
+- **Dispatcher** (`NexusFree.exe --dispatch`, the same engine copied to `%ProgramFiles%\NexusFree`): the scheduled task's
   only action, under `SYSTEM`. It moves each request out of the inbox, checks that its file belongs to the authorized
-  account, runs it, and writes the answer to the outbox (a temporary file renamed once complete). Every command is logged in `logs\elevation.log`; the engine removes answers nobody collected after 24 hours.
+  account, runs it, and writes the answer to the outbox (a temporary file renamed once complete). Every request is logged in `logs\elevation.log` (its id and exit code, never the command); the engine removes answers nobody collected after 24 hours.
 
 <details>
 <summary><b>Access rights</b> (<code>daemon/setup-system.ps1</code>, by SID so any Windows language works)</summary>
 
 | Path | SYSTEM, Administrators | Authorized account | Other accounts |
 |---|---|---|---|
-| `%ProgramFiles%\NexusFree` (dispatcher, `config.json`) | full | read | read |
+| `%ProgramFiles%\NexusFree` (`NexusFree.exe`, `config.json`) | full | read | read |
 | `%ProgramData%\NexusFree\inbox`, `outbox` | full | modify | none |
 | `%ProgramData%\NexusFree\logs` | full | read | none |
 | `%ProgramData%\NexusFree\staging` | full | none | none |

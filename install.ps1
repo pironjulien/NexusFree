@@ -1,6 +1,6 @@
-﻿# install.ps1
+# install.ps1
 # Installs NexusFree for the current Windows account: the native engine in %USERPROFILE%\.nexus\nexus-free, then, with
-# -Apply, the SYSTEM side (dispatcher, spool ACLs, scheduled task, see daemon\setup-system.ps1) and Antigravity's
+# -Apply, the SYSTEM side (the engine as dispatcher, spool ACLs, scheduled task, see daemon\setup-system.ps1) and Antigravity's
 # plugin. Claude Code and Codex get the plugin from the NexusSystem catalog.
 #
 # Run it as the account that will use NexusFree, not from an elevated prompt of another account: that account is the
@@ -59,15 +59,15 @@ function Invoke-ThroughNexusFree([string]$Command) {
 
 function Invoke-Setup {
     $setup = Join-Path $daemonDir 'setup-system.ps1'
-    $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$setup`" -UserSid $userSid -SourceDir `"$daemonDir`""
+    $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$setup`" -UserSid $userSid -EnginePath `"$exePath`""
     if (Test-IsAdmin) {
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup -UserSid $userSid -SourceDir $daemonDir
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $setup -UserSid $userSid -EnginePath $exePath
         if ($LASTEXITCODE) { throw "setup-system.ps1 failed ($LASTEXITCODE)." }
         return
     }
     # Single quotes only: 1.0's dispatcher lost double quotes on the way to its PowerShell.
     function Quote([string]$Text) { "'" + $Text.Replace("'", "''") + "'" }
-    $viaFree = Invoke-ThroughNexusFree "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $(Quote $setup) -UserSid $userSid -SourceDir $(Quote $daemonDir)"
+    $viaFree = Invoke-ThroughNexusFree "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $(Quote $setup) -UserSid $userSid -EnginePath $(Quote $exePath)"
     if ($viaFree) {
         if (-not $viaFree.success) { throw "SYSTEM setup through NexusFree failed: $($viaFree.error) $($viaFree.output)" }
         return

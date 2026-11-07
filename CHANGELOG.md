@@ -14,12 +14,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `free_status` reports the task's last run and its result.
 
 ### Changed
+- The SYSTEM dispatcher is native: the scheduled task runs `NexusFree.exe --dispatch` (the engine, copied to
+  `%ProgramFiles%\NexusFree`) instead of PowerShell and `Dispatch-NexusFree.ps1`, which is removed. Same protocol and
+  checks: request moved to staging, refused unless its file belongs to the authorized account, Administrators or SYSTEM,
+  run in PowerShell with UTF-8 output (lines that are not UTF-8 read in the OEM code page), answer written to `.tmp` then
+  renamed, request id and exit code logged. A command waiting for input ends at once (its input is closed), and a
+  background program that keeps the output open no longer holds the answer back beyond 5 seconds.
+- Tests delete their own temporary folders directly instead of sending them to the Recycle Bin.
+- CodeQL runs as a workflow file (`codeql.yml`, actions and C#) instead of the default setup, so OpenSSF Scorecard
+  credits it (SAST).
 - The engine reads and starts the SYSTEM task through the Task Scheduler API (COM `Schedule.Service`) instead of
   running `schtasks.exe` and returning its localized CSV: `taskStatus` is now a state name (Ready, Running...).
 - Strict build: recommended .NET analyzers, code style enforced, warnings as errors (`.editorconfig` added).
 - Release workflow on NexusSystem's shared workflows v1.6.54, pinned by commit SHA.
 
 ### Fixed
+- Dependabot can restore the NuGet packages again: `Directory.Build.props` takes the user profile from .NET instead of
+  `USERPROFILE`, which is unset on its Linux runner (the build folder fell to `/.nexus`, access denied).
 - A SYSTEM answer can no longer be lost. The dispatcher writes `<id>.json.tmp` and renames it to `<id>.json` in the
   same folder (atomic on one volume), so the client never sees a half-written answer. The client watches only the
   final file with a `FileSystemWatcher` (polling kept as the fallback), parses it before deleting it, and reads it

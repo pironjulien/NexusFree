@@ -78,4 +78,20 @@ internal static class Strings
     internal static string TaskMissing => T("Not installed", "Non installée");
 
     internal static string TaskError(string message) => T($"Error: {message}", $"Erreur : {message}");
+
+    internal static string RequestRefused(string owner) => T(
+        $"Request refused: its file belongs to {owner}, not to the authorized account.",
+        $"Requête refusée : son fichier appartient à {owner}, pas au compte autorisé.");
+
+    internal static string RequestWithoutCommand => T(
+        "Request without a command ('command' missing or empty).",
+        "Requête sans commande (champ 'command' manquant ou vide).");
+
+    internal static string RequestUnreadable(string message) => T(
+        $"Unreadable request: {message}",
+        $"Requête illisible : {message}");
+
+    internal static string ShellNotStarted(string message) => T(
+        $"PowerShell could not be started: {message}",
+        $"Impossible de démarrer PowerShell : {message}");
 }

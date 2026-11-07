@@ -16,32 +16,25 @@ internal static class TestEnvironment
         Environment.SetEnvironmentVariable("NEXUS_JOURNAL_HOME", JournalHome);
         Environment.SetEnvironmentVariable("NEXUS_JOURNAL", "1");
         Environment.SetEnvironmentVariable("NEXUS_AGENT", null);
-        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => DeleteOwnTemporary(JournalHome);
+    }
+
+    /// <summary>
+    /// Deletes a folder a test created for itself, directly (a test's scratch never goes to the Recycle Bin). Only a
+    /// direct child of the temporary folder named <c>nexusfree-*</c>, and never through a link: anything else stays.
+    /// </summary>
+    internal static void DeleteOwnTemporary(string directory)
+    {
+        try
         {
-            try
-            {
-                var root = Path.GetFullPath(JournalHome);
-                var temporary = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar);
-                if (!string.Equals(Path.GetDirectoryName(root), temporary, StringComparison.OrdinalIgnoreCase)
-                    || !Path.GetFileName(root).StartsWith("nexusfree-tests-", StringComparison.Ordinal)) return;
-                var pending = new Stack<string>(); pending.Push(root);
-                while (pending.TryPop(out var directory))
-                {
-                    if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0) return;
-                    foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
-                    {
-                        var attributes = File.GetAttributes(entry);
-                        if ((attributes & FileAttributes.ReparsePoint) != 0) return;
-                        if ((attributes & FileAttributes.Directory) != 0) pending.Push(entry);
-                        else if (!Path.GetExtension(entry).Equals(".jsonl", StringComparison.OrdinalIgnoreCase)) return;
-                    }
-                }
-                Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(root,
-                    Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
-                    Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin,
-                    Microsoft.VisualBasic.FileIO.UICancelOption.DoNothing);
-            }
-            catch (Exception) { } // Keep the owned fixture when recycling is unavailable; never delete as a fallback.
-        };
+            string root = Path.GetFullPath(directory);
+            string temporary = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar);
+            if (!string.Equals(Path.GetDirectoryName(root), temporary, StringComparison.OrdinalIgnoreCase)
+                || !Path.GetFileName(root).StartsWith("nexusfree-", StringComparison.Ordinal)
+                || !Directory.Exists(root)
+                || (File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0) return;
+            Directory.Delete(root, recursive: true); // does not follow links inside: they are removed, not their targets
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // a locked file: left for the OS
     }
 }

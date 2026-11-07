@@ -1,6 +1,7 @@
 ﻿# setup-system.ps1
-# Privileged setup of NexusFree (run elevated, by install.ps1): installs the SYSTEM dispatcher, creates the spool in
-# %ProgramData%\NexusFree with explicit ACLs, and registers the SYSTEM scheduled task "NexusFree".
+# Privileged setup of NexusFree (run elevated, by install.ps1): installs the native SYSTEM dispatcher
+# (NexusFree.exe --dispatch) in %ProgramFiles%\NexusFree, creates the spool in %ProgramData%\NexusFree with explicit
+# ACLs, and registers the SYSTEM scheduled task "NexusFree".
 #
 # One Windows account is authorized: the one that ran install.ps1 (-UserSid). Only that account, SYSTEM and
 # Administrators can drop a request in the inbox, read the answers or start the task. Every other account on the PC
@@ -8,7 +9,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)] [string]$UserSid,
-    [string]$SourceDir = $PSScriptRoot
+    # The engine to install: the one next to install.ps1 in a release package by default.
+    [string]$EnginePath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'NexusFree.exe')
 )
 $ErrorActionPreference = 'Stop'
 
@@ -16,18 +18,27 @@ $user = [Security.Principal.SecurityIdentifier]::new($UserSid)  # throws on a ma
 $system = [Security.Principal.SecurityIdentifier]::new('S-1-5-18')
 $admins = [Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
 
-$installFilesDir = Join-Path $env:ProgramFiles 'NexusFree'
-$installedDispatcher = Join-Path $installFilesDir 'Dispatch-NexusFree.ps1'
-$configFile = Join-Path $installFilesDir 'config.json'
-$sourceDispatcher = Join-Path $SourceDir 'Dispatch-NexusFree.ps1'
-if (-not (Test-Path -LiteralPath $sourceDispatcher)) { throw "Dispatcher not found: $sourceDispatcher" }
+if (-not (Test-Path -LiteralPath $EnginePath -PathType Leaf)) { throw "Engine not found: $EnginePath" }
+$product = (Get-Item -LiteralPath $EnginePath).VersionInfo.ProductName
+if ($product -ne 'NexusFree') { throw "Not the NexusFree engine: $EnginePath ($product)" }
 
+$installFilesDir = Join-Path $env:ProgramFiles 'NexusFree'
+$installedEngine = Join-Path $installFilesDir 'NexusFree.exe'
+$configFile = Join-Path $installFilesDir 'config.json'
 $spoolDir = Join-Path $env:ProgramData 'NexusFree'
 $taskName = 'NexusFree'
 
-# %ProgramFiles%\NexusFree: dispatcher and the authorized account, writable by SYSTEM and Administrators only.
+# %ProgramFiles%\NexusFree: the dispatcher and the authorized account, writable by SYSTEM and Administrators only.
 New-Item -ItemType Directory -Force -Path $installFilesDir | Out-Null
-Copy-Item -LiteralPath $sourceDispatcher -Destination $installedDispatcher -Force
+# A dispatcher still running (this very setup sent through NexusFree runs inside it) keeps its file: Windows lets a
+# running program be renamed, not replaced. Earlier renamed copies go once nothing runs them any more.
+Get-ChildItem -LiteralPath $installFilesDir -Filter 'NexusFree.exe.old-*' -ErrorAction SilentlyContinue |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+if (Test-Path -LiteralPath $installedEngine) {
+    try { Remove-Item -LiteralPath $installedEngine -Force }
+    catch { Rename-Item -LiteralPath $installedEngine -NewName "NexusFree.exe.old-$([guid]::NewGuid().ToString('N').Substring(0, 8))" }
+}
+Copy-Item -LiteralPath $EnginePath -Destination $installedEngine -Force
 [IO.File]::WriteAllText($configFile, (@{ userSid = $user.Value } | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
 
 function Rule([Security.Principal.SecurityIdentifier]$Sid, [string]$Rights) {
@@ -53,10 +64,8 @@ Set-SpoolAcl (Join-Path $spoolDir 'outbox') 'Modify'
 Set-SpoolAcl (Join-Path $spoolDir 'logs') 'ReadAndExecute'
 Set-SpoolAcl (Join-Path $spoolDir 'staging') $null
 
-$pwshExe = Get-Command pwsh.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
-if (-not $pwshExe) { $pwshExe = "$env:windir\System32\WindowsPowerShell\v1.0\powershell.exe" }
-
-$a = New-ScheduledTaskAction -Execute $pwshExe -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$installedDispatcher`""
+# The task runs the engine itself: no PowerShell host between Task Scheduler and the dispatcher.
+$a = New-ScheduledTaskAction -Execute $installedEngine -Argument '--dispatch'
 $s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::FromMinutes(30)) -MultipleInstances Parallel
 $p = New-ScheduledTaskPrincipal -UserId 'S-1-5-18' -LogonType ServiceAccount -RunLevel Highest
 
@@ -67,5 +76,8 @@ Register-ScheduledTask -TaskName $taskName -Action $a -Settings $s -Principal $p
 $svc = New-Object -ComObject Schedule.Service
 $svc.Connect()
 $svc.GetFolder('\').GetTask($taskName).SetSecurityDescriptor("D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FRFX;;;$($user.Value))", 0)
+
+# The PowerShell dispatcher of 1.2.5 and earlier, replaced by the engine.
+Remove-Item -LiteralPath (Join-Path $installFilesDir 'Dispatch-NexusFree.ps1') -Force -ErrorAction SilentlyContinue
 
 Write-Host "NexusFree SYSTEM task configured for $($user.Value)."
