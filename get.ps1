@@ -9,6 +9,8 @@
 # %USERPROFILE%\.nexus\nexus-free\releases\<version>, then runs its install.ps1 -Apply: one UAC prompt the first
 # time, none for an update. Read SECURITY.md first: this account will be able to act as SYSTEM without a prompt.
 # NEXUS_RELEASE_TAG: install that release (vX.Y.Z, or a development build vX.Y.Z-dev.N) instead of the latest.
+# For tests only: NEXUS_FREE_SOURCE (a local package instead of the latest release) with NEXUS_FREE_HOME (another folder
+# instead of %USERPROFILE%\.nexus\nexus-free): the package is unpacked and checked there, install.ps1 is never run.
 [CmdletBinding()]
 param()
 
@@ -60,41 +62,80 @@ function Get-ExpectedHash([byte[]]$Manifest, [string]$Name) {
     return $expected
 }
 
+function Move-StagedFolder([string]$From, [string]$To) {
+    # A folder cannot be renamed while any file inside it is open, whoever holds it. This installer never runs or keeps
+    # open anything in the staged folder, but antivirus and indexing services open freshly written executables for a
+    # moment to scan them, which made the rename fail with "being used by another process". Only that external,
+    # transient hold (sharing, lock or access violation while the staged folder is still there) is waited out, at most
+    # 10 s; any other error, or a longer hold, fails.
+    $transient = 0x80070020, 0x80070021, 0x80070005  # ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION, ERROR_ACCESS_DENIED
+    for ($attempt = 1; ; $attempt++) {
+        try { [IO.Directory]::Move($From, $To); return }
+        catch {
+            $failure = $_.Exception
+            while ($failure.InnerException -and $failure -is [Management.Automation.MethodInvocationException]) { $failure = $failure.InnerException }
+            $held = ($failure -is [IO.IOException] -or $failure -is [UnauthorizedAccessException]) -and
+                ($transient -contains $failure.HResult) -and (Test-Path -LiteralPath $From) -and -not (Test-Path -LiteralPath $To)
+            if (-not $held -or $attempt -ge 40) { throw "Cannot move $From to $($To): $($failure.Message)" }
+            Start-Sleep -Milliseconds 250
+        }
+    }
+}
+
 $rid = Get-Architecture
 $name = "NexusFree-$rid.zip"
+$local = [bool]$env:NEXUS_FREE_SOURCE
+if ($local -and -not $env:NEXUS_FREE_HOME) { throw 'NEXUS_FREE_SOURCE is for tests only and needs NEXUS_FREE_HOME.' }
+$home_ = if ($env:NEXUS_FREE_HOME) { $env:NEXUS_FREE_HOME } else { Join-Path $env:USERPROFILE '.nexus\nexus-free' }
+$releases = Join-Path $home_ 'releases'
+# Staged next to the releases folder (same volume: the final move is a rename), never inside it: every other folder
+# in releases is removed as an older version.
+New-Item -ItemType Directory -Force -Path $releases | Out-Null
+$staged = Join-Path $home_ ('staging-' + [guid]::NewGuid().ToString('N'))
 $work = Join-Path ([IO.Path]::GetTempPath()) "nexusfree-get-$PID"
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 try {
-    $tag = Get-LatestTag
-    $base = "https://github.com/$Repository/releases/download/$tag"
-    Write-Host "Downloading NexusFree $tag ($rid)..."
-    $package = Join-Path $work $name
-    Invoke-WebRequest -UseBasicParsing "$base/$name" -OutFile $package
-    $manifest = (Invoke-WebRequest -UseBasicParsing "$base/SHA256SUMS.txt").RawContentStream.ToArray()
-    $expected = Get-ExpectedHash $manifest $name
-    $actual = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($expected -ne $actual) { throw "SHA-256 mismatch for $($name): the download is not the published package." }
+    if ($local) {
+        $package = (Resolve-Path -LiteralPath $env:NEXUS_FREE_SOURCE).Path
+        Write-Host "Installing NexusFree from $package..."
+    } else {
+        $tag = Get-LatestTag
+        $base = "https://github.com/$Repository/releases/download/$tag"
+        Write-Host "Downloading NexusFree $tag ($rid)..."
+        $package = Join-Path $work $name
+        Invoke-WebRequest -UseBasicParsing "$base/$name" -OutFile $package
+        $manifest = (Invoke-WebRequest -UseBasicParsing "$base/SHA256SUMS.txt").RawContentStream.ToArray()
+        $expected = Get-ExpectedHash $manifest $name
+        $actual = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($expected -ne $actual) { throw "SHA-256 mismatch for $($name): the download is not the published package." }
+    }
 
-    $unpacked = Join-Path $work 'package'
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [IO.Compression.ZipFile]::ExtractToDirectory($package, $unpacked)
-    $exe = Join-Path $unpacked 'NexusFree.exe'
-    if (-not (Test-Path -LiteralPath $exe) -or -not (Test-Path -LiteralPath (Join-Path $unpacked 'install.ps1'))) { throw 'Not a NexusFree package.' }
-    $version = (& $exe --version | Select-Object -First 1) -replace '^NexusFree v(\S+).*$', '$1'
-    if ($version -notmatch '^\d+\.\d+\.\d+') { throw 'The package does not start on this PC.' }
+    [IO.Compression.ZipFile]::ExtractToDirectory($package, $staged)
+    $exe = Join-Path $staged 'NexusFree.exe'
+    if (-not (Test-Path -LiteralPath $exe) -or -not (Test-Path -LiteralPath (Join-Path $staged 'install.ps1'))) { throw 'Not a NexusFree package.' }
+    Get-ChildItem -LiteralPath $staged -Recurse -File | Unblock-File
+    # The version from the executable's version resource, without running it: a program just run from the staged
+    # folder is what scanners open right after, when the folder has to be renamed.
+    $version = "$((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion)".Split('+')[0].Trim()
+    if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Not a NexusFree package (no version).' }
 
-    $releases = Join-Path $env:USERPROFILE '.nexus\nexus-free\releases'
     $target = Join-Path $releases $version
     if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
-    New-Item -ItemType Directory -Force -Path $releases | Out-Null
-    Move-Item -LiteralPath $unpacked -Destination $target
-    Get-ChildItem -LiteralPath $target -Recurse -File | Unblock-File
+    Move-StagedFolder $staged $target
+    # Run once in place: the package must start on this PC's architecture and report the version it carries.
+    $answer = (& (Join-Path $target 'NexusFree.exe') --version | Select-Object -First 1) -replace '^NexusFree v(\S+).*$', '$1'
+    if ($LASTEXITCODE -or $answer -ne $version) {
+        Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
+        throw 'The package does not start on this PC.'
+    }
     Get-ChildItem -LiteralPath $releases -Directory | Where-Object { $_.Name -ne $version } |
         ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
 
+    if ($local) { Write-Host "NexusFree $version is in $target (test: install.ps1 not run)." -ForegroundColor Green; return }
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $target 'install.ps1') -Apply
     if ($LASTEXITCODE) { throw "install.ps1 failed ($LASTEXITCODE)." }
     Write-Host "NexusFree $version installed." -ForegroundColor Green
 } finally {
-    Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $work, $staged -Recurse -Force -ErrorAction SilentlyContinue
 }

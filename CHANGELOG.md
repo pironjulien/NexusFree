@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-11-07
+
+### Fixed
+- `get.ps1` no longer fails with "being used by another process" when a scanner briefly opens the freshly
+  extracted executable. The package is staged next to the releases folder and never run there: its version comes
+  from the executable's version resource, the staged folder is renamed to `releases\<version>`, and only then is
+  `--version` run in place (a package that does not answer its own version is removed again). A rename held by such
+  an external, transient scan (sharing, lock or access violation) is waited out for at most 10 s; any other error
+  still fails the installation. Older versions are removed only after that check.
+
+### Added
+- `get.ps1` test variables `NEXUS_FREE_SOURCE` and `NEXUS_FREE_HOME` (a local package in another folder,
+  install.ps1 never run), and its tests under PowerShell 7 and Windows PowerShell 5.1, a 2 s scanner hold included.
+
 ## [1.3.1] - 2026-11-07
 
 ### Fixed
@@ -140,7 +154,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Multi-agent plugins for Google Antigravity, Claude Code, and OpenAI Codex.
 - Offline unit and protocol test suite (`tests/NexusFree.Tests`).
 
-[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/pironjulien/NexusFree/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/pironjulien/NexusFree/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/pironjulien/NexusFree/compare/v1.2.5...v1.3.0
 [1.2.5]: https://github.com/pironjulien/NexusFree/compare/v1.2.4...v1.2.5
