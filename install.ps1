@@ -46,15 +46,27 @@ function Invoke-ThroughNexusFree([string]$Command) {
     [IO.File]::WriteAllText((Join-Path $spool "inbox\$id.json"), $request, [Text.UTF8Encoding]::new($false))
     schtasks.exe /run /tn $taskName | Out-Null
     $answer = Join-Path $spool "outbox\$id.json"
+    $log = Join-Path $spool 'logs\elevation.log'
     $deadline = (Get-Date).AddMinutes(5)
+    $ended = $null
     while (-not (Test-Path -LiteralPath $answer)) {
         if ((Get-Date) -gt $deadline) { throw 'NexusFree did not answer within 5 minutes.' }
+        # The dispatcher logs "Request <id> finished|failed" before writing the answer. A dispatcher of 1.3.2 or
+        # earlier that this very setup replaced can fail right after and never answer: once that line is logged, the
+        # answer gets 15 s, then the request is reported lost (Invoke-Setup sends it again, to the new dispatcher).
+        if (-not $ended -and (Get-Content -LiteralPath $log -Tail 200 -ErrorAction SilentlyContinue |
+                Select-String -SimpleMatch -CaseSensitive -Quiet "Request $id ")) { $ended = Get-Date }
+        if ($ended -and ((Get-Date) - $ended).TotalSeconds -gt 15) { return [pscustomobject]@{ lost = $true } }
         Start-Sleep -Milliseconds 300
     }
     Start-Sleep -Milliseconds 200
     $result = Get-Content -LiteralPath $answer -Raw | ConvertFrom-Json
     Remove-Item -LiteralPath $answer -Force -ErrorAction SilentlyContinue
     return $result
+}
+
+function Get-ProductVersion([string]$File) {
+    "$((Get-Item -LiteralPath $File -ErrorAction SilentlyContinue).VersionInfo.ProductVersion)".Split('+')[0]
 }
 
 function Invoke-Setup {
@@ -67,7 +79,17 @@ function Invoke-Setup {
     }
     # Single quotes only: 1.0's dispatcher lost double quotes on the way to its PowerShell.
     function Quote([string]$Text) { "'" + $Text.Replace("'", "''") + "'" }
-    $viaFree = Invoke-ThroughNexusFree "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $(Quote $setup) -UserSid $userSid -EnginePath $(Quote $exePath)"
+    $command = "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $(Quote $setup) -UserSid $userSid -EnginePath $(Quote $exePath)"
+    $viaFree = Invoke-ThroughNexusFree $command
+    if ($viaFree -and $viaFree.PSObject.Properties['lost']) {
+        # The dispatcher ended without answering. When the dispatcher installed now is this version, the setup did
+        # replace it, and the older one failed on its own replaced file: the setup (idempotent) is sent once more.
+        $installed = Join-Path $env:ProgramFiles 'NexusFree\NexusFree.exe'
+        if ((Get-ProductVersion $installed) -ne (Get-ProductVersion $exePath)) { throw 'SYSTEM setup through NexusFree ended without an answer.' }
+        Write-Host 'The previous dispatcher ended without answering; setup sent again to the new one.'
+        $viaFree = Invoke-ThroughNexusFree $command
+        if ($viaFree -and $viaFree.PSObject.Properties['lost']) { throw 'SYSTEM setup through NexusFree ended without an answer.' }
+    }
     if ($viaFree) {
         if (-not $viaFree.success) { throw "SYSTEM setup through NexusFree failed: $($viaFree.error) $($viaFree.output)" }
         return

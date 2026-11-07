@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.4] - 2026-11-07
+
+### Fixed
+- Updating from 1.3.2 or earlier no longer fails with "NexusFree did not answer within 5 minutes". The SYSTEM setup
+  runs inside the installed dispatcher and replaces its file; a dispatcher without the 1.3.3 fix then failed on its
+  own replaced file and never answered, so the update stopped before Antigravity's plugin. `install.ps1` now reads the
+  dispatcher's log: when the request ended without an answer and the dispatcher installed is already this version, it
+  sends the setup (idempotent) once more, to the new dispatcher, and carries on.
+
 ## [1.3.3] - 2026-11-07
 
 ### Fixed
@@ -174,7 +183,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Multi-agent plugins for Google Antigravity, Claude Code, and OpenAI Codex.
 - Offline unit and protocol test suite (`tests/NexusFree.Tests`).
 
-[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.3.3...HEAD
+[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.3.4...HEAD
+[1.3.4]: https://github.com/pironjulien/NexusFree/compare/v1.3.3...v1.3.4
 [1.3.3]: https://github.com/pironjulien/NexusFree/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/pironjulien/NexusFree/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/pironjulien/NexusFree/compare/v1.3.0...v1.3.1
