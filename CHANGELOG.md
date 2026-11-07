@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-07
+
+### Fixed
+- `get.ps1` works under Windows PowerShell started from PowerShell 7 or from a .NET process that inherited its
+  module folders (NexusSystem's maintenance run by hand): it keeps only Windows PowerShell's own module folders, so
+  `Get-FileHash` loads again, as in the other Nexus products.
+
 ## [1.3.0] - 2026-11-07
 
 ### Added
@@ -131,7 +138,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Multi-agent plugins for Google Antigravity, Claude Code, and OpenAI Codex.
 - Offline unit and protocol test suite (`tests/NexusFree.Tests`).
 
-[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/pironjulien/NexusFree/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/pironjulien/NexusFree/compare/v1.2.5...v1.3.0
 [1.2.5]: https://github.com/pironjulien/NexusFree/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/pironjulien/NexusFree/compare/v1.2.3...v1.2.4
