@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-07
+
 ### Added
 - French when Windows is in French, English otherwise: the MCP instructions, tool descriptions, results and errors
   follow the Windows display language. The plugin guide is in English; Antigravity's copy is installed in French on a
@@ -129,7 +131,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Multi-agent plugins for Google Antigravity, Claude Code, and OpenAI Codex.
 - Offline unit and protocol test suite (`tests/NexusFree.Tests`).
 
-[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.2.5...HEAD
+[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/pironjulien/NexusFree/compare/v1.2.5...v1.3.0
 [1.2.5]: https://github.com/pironjulien/NexusFree/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/pironjulien/NexusFree/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/pironjulien/NexusFree/compare/v1.2.2...v1.2.3
