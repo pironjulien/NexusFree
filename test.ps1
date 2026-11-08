@@ -9,7 +9,7 @@ $env:DOTNET_NOLOGO = '1'
 
 Push-Location $PSScriptRoot
 try {
-    # Every PowerShell script of the package parses (install.ps1, get.ps1, daemon\setup-system.ps1).
+    # Every PowerShell script of the package parses (install.ps1, get.ps1).
     foreach ($script in Get-ChildItem -Path . -Filter *.ps1 -Recurse -File | Where-Object FullName -notmatch '[\\/](bin|obj|TestResults)[\\/]') {
         $errors = $null
         [void][System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$null, [ref]$errors)

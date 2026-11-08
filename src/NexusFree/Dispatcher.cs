@@ -13,7 +13,7 @@ namespace NexusFree;
 /// The SYSTEM side of NexusFree (<c>NexusFree.exe --dispatch</c>), the only action of the scheduled task "NexusFree".
 /// For each request of the inbox: moved to staging (out of the authorized account's reach), refused unless its file
 /// belongs to the authorized account, Administrators or SYSTEM, run in PowerShell, and answered in the outbox under a
-/// temporary name renamed once complete. The spool is never created here: without the ACLs of setup-system.ps1, any
+/// temporary name renamed once complete. The spool is never created here: without the ACLs of SystemSetup, any
 /// account could write to it.
 /// </summary>
 internal sealed class Dispatcher

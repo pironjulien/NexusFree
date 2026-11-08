@@ -1,8 +1,8 @@
 # Release, in two channels, with the shared Nexus release workflows of NexusSystem.
-# - Development: every push to main runs test.ps1 and builds the engine for Windows x64 and Arm64 (self-contained
-#   single file, no .NET to install): NexusFree-win-x64.zip and NexusFree-win-arm64.zip (engine, install.ps1, the
-#   SYSTEM dispatcher and its setup, Antigravity's plugin), get.ps1 and SHA256SUMS.txt. product-dev-release attests
-#   them and publishes the pre-release vX.Y.Z-dev.N.
+# - Development: every push to main runs test.ps1 and builds the engine for Windows x64 and Arm64 (Native AOT: one
+#   NexusFree.exe compiled ahead of time, no .NET to install): NexusFree-win-x64.zip and NexusFree-win-arm64.zip (the
+#   engine, which installs itself and the SYSTEM dispatcher, install.ps1, the plugin files), get.ps1 and SHA256SUMS.txt.
+#   product-dev-release attests them and publishes the pre-release vX.Y.Z-dev.N.
 # - Stable: right after that build when its version is not released yet, or "Run workflow" (promote: a vX.Y.Z-dev.N,
 #   or empty for the newest), product-promote publishes the SAME files as vX.Y.Z with the CHANGELOG section.
 #   NexusFree is not sent to the MCP registry. get.ps1 installs from releases/latest.
@@ -63,14 +63,17 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory dist | Out-Null
+          # Native AOT finds the C++ linker through vswhere, which is not on PATH outside a developer prompt.
+          $env:PATH = "$env:PATH;$(Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer')"
           foreach ($rid in 'win-x64', 'win-arm64') {
             $out = Join-Path $env:RUNNER_TEMP "publish-$rid"
-            dotnet publish src/NexusFree/NexusFree.csproj -c Release -r $rid --self-contained true -p:PublishSingleFile=true -o $out
+            # PublishAot (src/NexusFree/NexusFree.csproj): one NexusFree.exe compiled ahead of time, nothing beside it.
+            dotnet publish src/NexusFree/NexusFree.csproj -c Release -r $rid -p:DebugType=none -o $out
             if ($LASTEXITCODE) { throw "dotnet publish $rid failed." }
-            if (-not (Test-Path "$out/NexusFree.exe")) { throw "$rid output incomplete." }
-            Get-ChildItem $out -Filter *.pdb | Remove-Item
+            $files = @(Get-ChildItem $out -File | ForEach-Object Name)
+            if (($files -join ',') -ne 'NexusFree.exe') { throw "$rid output is not one native engine: $($files -join ', ')" }
             Copy-Item install.ps1, LICENSE, README.md, SECURITY.md $out
-            Copy-Item daemon, plugin, fr $out -Recurse
+            Copy-Item plugin, fr $out -Recurse
             Compress-Archive -Path "$out/*" -DestinationPath "dist/NexusFree-$rid.zip"
           }
           $version = & "$env:RUNNER_TEMP/publish-win-x64/NexusFree.exe" --version

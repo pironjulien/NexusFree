@@ -5,6 +5,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-08
+
+### Changed
+- The engine is compiled ahead of time (Native AOT): one native `NexusFree.exe` per architecture, no .NET to install,
+  no JIT at start-up. Measured on the same PC (x64), 1.3.4 single file → 1.4.0: file 70.2 MB → 4.1 MB; start-up
+  (`--version`) 44 ms → 13 ms; an idle MCP server 44.3 MB → 15.5 MB of working set and 13.2 MB → 4.8 MB of private
+  bytes; a simple elevated command end to end (`--exec "exit 0"`, request, SYSTEM dispatcher, answer) 413 ms → 292 ms
+  (medians). The trimming and AOT analyzers run in every build with warnings as errors.
+- The Task Scheduler API goes through source-generated COM interop instead of the runtime COM binder (`dynamic`), and
+  every COM object is released when its call ends.
+- The installation lives in the engine. `NexusFree.exe --install [--apply]` copies the engine for this account, sets up
+  the SYSTEM side and writes Antigravity's plugin (embedded in the engine); `NexusFree.exe --setup-system --user-sid
+  <SID>`, run elevated, installs the dispatcher, sets the spool ACLs and registers the SYSTEM task through the Task
+  Scheduler API, with the same rights, task definition and checks as before. `install.ps1` only compiles the engine
+  from source when needed and starts it. The UAC prompt of a first install now names `NexusFree.exe`.
+- Renaming a running engine aside during an update is safe without preloading anything: a native image never reads
+  its file again (tested on the release build).
+
+### Removed
+- `daemon/setup-system.ps1`, replaced by `NexusFree.exe --setup-system`, and the assembly preloading of 1.3.3
+  (`SelfImage`). Updating from 1.3.x: that preloading missed `System.Private.Uri`, so the 1.3.x dispatcher can still
+  fail once after the setup replaced it; the installer then sends the setup once more, to the new dispatcher, as it
+  already did for 1.3.2 and earlier.
+
 ### Fixed
 - Tests: no test can show a Windows error box. The test process sets the error mode (no critical-error, crash or
   missing-file box) when it loads, and every process it starts inherits it; a test checks it in a child process.

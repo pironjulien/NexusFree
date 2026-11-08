@@ -2,7 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <Version>1.3.4</Version>
+    <Version>1.4.0</Version>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>NexusFree</AssemblyName>
@@ -10,14 +10,32 @@
     <InvariantGlobalization>false</InvariantGlobalization>
     <!-- Both release architectures in the restore graph, so packages.lock.json covers the release publishes. -->
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
-    <!-- The package below is pinned on purpose (see there): its "delete explicit reference" notice is answered. -->
+    <!-- Native AOT: a release is one NexusFree.exe compiled ahead of time per architecture (no .NET to install, no JIT
+         at start-up, no assembly loaded later from its own file, so an update may rename it while it runs). The
+         trimming, single-file and AOT analyzers run in every build and, with warnings as errors, no reflection-based
+         JSON, runtime COM binder or runtime-marshalled call can come back; reflection-based JSON is off in every build,
+         so the tests run the engine the way the release does. -->
+    <PublishAot>true</PublishAot>
+    <IsAotCompatible>true</IsAotCompatible>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <!-- Source-generated COM interop (the Task Scheduler API, SystemTask.cs) emits unsafe code. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- The two packages below are pinned on purpose (see there): their "delete explicit reference" notice is answered. -->
+    <SuppressGenerateILCompilerExplicitPackageReferenceWarning>true</SuppressGenerateILCompilerExplicitPackageReferenceWarning>
     <SuppressILLinkExplicitPackageReferenceWarning>true</SuppressILLinkExplicitPackageReferenceWarning>
   </PropertyGroup>
   <ItemGroup>
-    <!-- The trimmer's tasks, which the self-contained single-file publish adds: pinned like any package
-         (packages.lock.json, Dependabot); left implicit, their version would follow the .NET SDK of the machine and
-         break the locked restore whenever the CI's SDK moves. -->
+    <!-- The AOT compiler and the trimmer, pinned like any package (packages.lock.json, Dependabot): left implicit, their
+         version would follow the .NET SDK of the machine and break the locked restore whenever the CI's SDK moves. -->
+    <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="10.0.14" />
     <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="10.0.14" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Antigravity's plugin, written by `NexusFree.exe install` (manifest, logo, guide in English and French). -->
+    <EmbeddedResource Include="..\..\plugin\plugin.json" LogicalName="antigravity/plugin.json" />
+    <EmbeddedResource Include="..\..\plugin\logo.png" LogicalName="antigravity/logo.png" />
+    <EmbeddedResource Include="..\..\plugin\skills\nexus-free\SKILL.md" LogicalName="antigravity/SKILL.md" />
+    <EmbeddedResource Include="..\..\fr\plugin\antigravity\skills\nexus-free\SKILL.md" LogicalName="antigravity/fr/SKILL.md" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="NexusFree.Tests" />

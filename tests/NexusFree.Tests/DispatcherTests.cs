@@ -119,7 +119,7 @@ public sealed class DispatcherTests : IDisposable
 
         Assert.Equal(1, await For(Dispatcher.OwnerOf(request)).RunAsync());
 
-        Assert.False(Directory.Exists(Folder("staging"))); // never recreated without setup-system.ps1's ACLs
+        Assert.False(Directory.Exists(Folder("staging"))); // never recreated without SystemSetup's ACLs
         Assert.True(File.Exists(request));
     }
 

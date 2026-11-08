@@ -91,10 +91,11 @@ git clone https://github.com/pironjulien/NexusFree
 powershell -NoProfile -ExecutionPolicy Bypass -File NexusFree\install.ps1 -Apply
 ```
 
-From the source it builds the engine with the .NET 10 SDK; from a release package (`NexusFree-win-x64.zip`,
+From the source it compiles the engine (Native AOT: the .NET 10 SDK and Visual Studio's C++ build tools); from a release package (`NexusFree-win-x64.zip`,
 `NexusFree-win-arm64.zip`, checked against the release's `SHA256SUMS.txt`), the engine is already built. The `SYSTEM`
 side needs one UAC prompt; later runs (updates) go through NexusFree itself. Claude Code and Codex get the plugin from
-the [NexusSystem](https://github.com/pironjulien/NexusSystem) catalog; `install.ps1` declares it to Antigravity.
+the [NexusSystem](https://github.com/pironjulien/NexusSystem) catalog; the engine declares it to Antigravity. `install.ps1` only starts
+the engine's own installer (`NexusFree.exe --install --apply`).
 
 </details>
 
@@ -110,14 +111,15 @@ flowchart LR
     D -- "answer file" --> O["outbox"] --> E
 ```
 
-- **Engine** (`src/NexusFree`): native C# (.NET 10) stdio MCP server, also `--status`, `--exec "<command>"` and
-  `--version` (and `--dispatch`, the SYSTEM side).
+- **Engine** (`src/NexusFree`): native C# (.NET 10, compiled ahead of time: one 4 MB `NexusFree.exe`) stdio MCP server,
+  also `--status`, `--exec "<command>"`, `--version`, `--install [--apply]` and `--setup-system --user-sid <SID>` (the
+  elevated setup) and `--dispatch` (the SYSTEM side).
 - **Dispatcher** (`NexusFree.exe --dispatch`, the same engine copied to `%ProgramFiles%\NexusFree`): the scheduled task's
   only action, under `SYSTEM`. It moves each request out of the inbox, checks that its file belongs to the authorized
   account, runs it, and writes the answer to the outbox (a temporary file renamed once complete). Every request is logged in `logs\elevation.log` (its id and exit code, never the command); the engine removes answers nobody collected after 24 hours.
 
 <details>
-<summary><b>Access rights</b> (<code>daemon/setup-system.ps1</code>, by SID so any Windows language works)</summary>
+<summary><b>Access rights</b> (set by <code>NexusFree.exe --setup-system</code>, by SID so any Windows language works)</summary>
 
 | Path | SYSTEM, Administrators | Authorized account | Other accounts |
 |---|---|---|---|

@@ -11,8 +11,14 @@ public static class Program
         // The SYSTEM task's action: answers the spool's requests. First, before anything writes to a user profile.
         if (args.Contains("--dispatch"))
         {
-            SelfImage.Pin(); // an update may replace this very file while it runs (setup-system.ps1 sent through NexusFree)
             return await Dispatcher.RunInstalledAsync();
+        }
+
+        // The privileged setup, run elevated by the installer (or by an administrator): nothing in a user profile.
+        if (args.Contains("--setup-system"))
+        {
+            int sidIndex = Array.IndexOf(args, "--user-sid");
+            return Report(() => SystemSetup.Run(sidIndex >= 0 && sidIndex + 1 < args.Length ? args[sidIndex + 1] : null));
         }
 
         int agentIndex = Array.IndexOf(args, "--agent");
@@ -30,6 +36,17 @@ public static class Program
             return 0;
         }
 
+        if (args.Contains("--install"))
+        {
+            try { return await Installer.RunAsync(apply: args.Contains("--apply")); }
+            catch (Exception ex) when (ex is Installer.InstallException or IOException or UnauthorizedAccessException or InvalidOperationException
+                or System.ComponentModel.Win32Exception or System.Runtime.InteropServices.COMException)
+            {
+                Console.Error.WriteLine($"NexusFree installation failed: {ex.Message}");
+                return 1;
+            }
+        }
+
         if (args.Contains("--status"))
         {
             var status = Engine.GetStatus();
@@ -41,7 +58,6 @@ public static class Program
         if (execIndex >= 0 && execIndex + 1 < args.Length)
         {
             string cmd = args[execIndex + 1];
-            SelfImage.Pin();
             var res = await Engine.ExecuteAsync(cmd);
             Console.WriteLine(res.Output);
             if (!string.IsNullOrWhiteSpace(res.Error))
@@ -51,10 +67,22 @@ public static class Program
             return res.ExitCode;
         }
 
-        // Default, or with --mcp: stdio MCP server, which lives as long as its AI session, updates included.
-        SelfImage.Pin();
+        // Default, or with --mcp: stdio MCP server, which lives as long as its AI session, updates included (a native
+        // image: renaming its file aside for an update never takes anything from a running engine).
         await McpServer.RunStdioAsync();
         return 0;
+    }
+
+    /// <summary>Runs a setup step; a failure is printed as one line and exit code 1, never as an unhandled crash.</summary>
+    private static int Report(Func<int> step)
+    {
+        try { return step(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
+            or System.Runtime.InteropServices.COMException or System.Security.Principal.IdentityNotMappedException)
+        {
+            Console.Error.WriteLine($"NexusFree SYSTEM setup failed: {ex.GetType().Name}: {ex.Message}");
+            return 1;
+        }
     }
 
     public static void WriteStatusFile()

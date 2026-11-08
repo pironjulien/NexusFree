@@ -20,7 +20,7 @@ public issue. Include your Windows version, the account types involved and the s
   account, Administrators or `SYSTEM`.
 - **Logs:** every request is recorded in `%ProgramData%\NexusFree\logs\elevation.log` by its id and exit code, never its
   command; the AI app's own transcript keeps the command, so do not pass secrets on the command line.
-- **Updates:** `install.ps1 -Apply` sent through an installed NexusFree replaces the dispatcher (`%ProgramFiles%\NexusFree\NexusFree.exe`) under `SYSTEM`; run it
+- **Updates:** `install.ps1 -Apply` runs `NexusFree.exe --setup-system` through an installed NexusFree, which replaces the dispatcher (`%ProgramFiles%\NexusFree\NexusFree.exe`) under `SYSTEM`; run it
   only from a copy you trust (a release whose files match its `SHA256SUMS.txt` and build attestation, or the
   repository).
 

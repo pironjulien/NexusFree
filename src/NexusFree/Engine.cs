@@ -54,7 +54,7 @@ public sealed class Engine
             if (task.LastRun is DateTime run) lastRun = new DateTimeOffset(DateTime.SpecifyKind(run, DateTimeKind.Local)).ToString("o", CultureInfo.InvariantCulture);
             if (task.LastResult is int code) lastResult = code;
         }
-        catch (Exception ex) when (ex is COMException or UnauthorizedAccessException or InvalidOperationException or InvalidCastException or Microsoft.CSharp.RuntimeBinder.RuntimeBinderException)
+        catch (Exception ex) when (ex is COMException or UnauthorizedAccessException or InvalidOperationException or InvalidCastException or FileNotFoundException)
         {
             taskStatus = Strings.TaskError(ex.Message);
         }
@@ -71,7 +71,16 @@ public sealed class Engine
         };
     }
 
-    public static async Task<CommandResult> ExecuteAsync(string command, int timeoutSeconds = 600, CancellationToken ct = default)
+    /// <summary>The exit code of a wait cancelled by its caller.</summary>
+    internal const int CancelledExitCode = 130;
+
+    internal static string NewRequestId() => "req-" + Guid.NewGuid().ToString("N");
+
+    public static Task<CommandResult> ExecuteAsync(string command, int timeoutSeconds = 600, CancellationToken ct = default) =>
+        ExecuteAsync(command, NewRequestId(), TimeSpan.FromSeconds(timeoutSeconds), ct);
+
+    /// <summary>Drops request <paramref name="id"/> in the inbox, starts the SYSTEM task and waits for its answer.</summary>
+    internal static async Task<CommandResult> ExecuteAsync(string command, string id, TimeSpan timeout, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(command))
         {
@@ -85,7 +94,6 @@ public sealed class Engine
 
         PruneOutbox(OutboxDir, DateTime.UtcNow);
 
-        string id = "req-" + Guid.NewGuid().ToString("N");
         string inFile = Path.Combine(InboxDir, $"{id}.json");
         string outFile = Path.Combine(OutboxDir, $"{id}.json");
 
@@ -103,13 +111,13 @@ public sealed class Engine
         {
             SystemTask.Run(TaskName);
         }
-        catch (Exception ex) when (ex is COMException or UnauthorizedAccessException or InvalidOperationException or InvalidCastException or Microsoft.CSharp.RuntimeBinder.RuntimeBinderException)
+        catch (Exception ex) when (ex is COMException or UnauthorizedAccessException or InvalidOperationException or InvalidCastException or FileNotFoundException)
         {
             try { File.Delete(inFile); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             return new CommandResult { Id = id, Success = false, ExitCode = 1, Error = Strings.TriggerFailed(TaskName, ex.Message) };
         }
 
-        return await WaitForResultAsync(outFile, id, TimeSpan.FromSeconds(timeoutSeconds), ct);
+        return await WaitForResultAsync(outFile, id, timeout, ct);
     }
 
     /// <summary>
@@ -207,7 +215,7 @@ public sealed class Engine
             {
                 Id = id,
                 Success = false,
-                ExitCode = 130,
+                ExitCode = CancelledExitCode,
                 Error = Strings.Cancelled
             };
         }

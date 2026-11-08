@@ -12,7 +12,7 @@ namespace NexusFree;
 public sealed class McpServer
 {
     public const string ServerName = "nexus-free";
-    public const string ServerVersion = "1.3.4";
+    public const string ServerVersion = "1.4.0";
     public static string? ConfiguredAgent { get; set; }
     public static string CurrentAgent { get; set; } = "antigravity";
     private static readonly HashSet<string> Protocols = ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"];
@@ -177,8 +177,7 @@ public sealed class McpServer
             {
                 sw.Stop();
                 isError = true;
-                string? replacedBy = SelfImage.ReplacedBy();
-                resultText = replacedBy is null ? Strings.ToolFailed(toolName, ex.Message) : Strings.UpdatedWhileOpen(toolName, replacedBy, ex.Message);
+                resultText = Strings.ToolFailed(toolName, ex.Message);
                 Journal.Write(CurrentAgent, toolName, null, null, false, 1, sw.Elapsed.TotalMilliseconds, ex.Message);
             }
 
@@ -188,14 +187,12 @@ public sealed class McpServer
                 ["id"] = id?.DeepClone(),
                 ["result"] = new JsonObject
                 {
-                    ["content"] = new JsonArray
-                    {
+                    ["content"] = new JsonArray(
                         new JsonObject
                         {
                             ["type"] = "text",
                             ["text"] = resultText
-                        }
-                    },
+                        }),
                     ["isError"] = isError
                 }
             };
@@ -215,8 +212,7 @@ public sealed class McpServer
 
     private static JsonArray GetToolsSchema()
     {
-        return new JsonArray
-        {
+        return new JsonArray(
             new JsonObject
             {
                 ["name"] = "free",
@@ -237,7 +233,7 @@ public sealed class McpServer
                             ["description"] = Strings.TimeoutDescription
                         }
                     },
-                    ["required"] = new JsonArray { "command" }
+                    ["required"] = new JsonArray("command")
                 }
             },
             new JsonObject
@@ -249,7 +245,6 @@ public sealed class McpServer
                     ["type"] = "object",
                     ["properties"] = new JsonObject()
                 }
-            }
-        };
+            });
     }
 }

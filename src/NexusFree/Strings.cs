@@ -42,10 +42,6 @@ internal static class Strings
         $"Tool {name} failed: {message}",
         $"Erreur d'exécution de l'outil {name} : {message}");
 
-    internal static string UpdatedWhileOpen(string name, string version, string message) => T(
-        $"Tool {name} failed: NexusFree was updated{(version.Length > 0 ? " to " + version : "")} while this session was open, and this session's engine can no longer read its own file. Reconnect the nexus-free MCP server (or start a new session), then run the command again. ({message})",
-        $"Erreur d'exécution de l'outil {name} : NexusFree a été mis à jour{(version.Length > 0 ? " en " + version : "")} pendant que cette session était ouverte, et le moteur de cette session ne peut plus lire son propre fichier. Reconnectez le serveur MCP nexus-free (ou ouvrez une nouvelle session), puis relancez la commande. ({message})");
-
     internal static string UnsupportedMethod(string method) => T($"Unsupported method: {method}", $"Méthode non supportée : {method}");
 
     internal static string EmptyCommand => T("The command to run is empty.", "La commande à exécuter est vide.");

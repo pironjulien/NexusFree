@@ -6,9 +6,9 @@ namespace NexusFree.Tests;
 
 /// <summary>
 /// An AI session keeps its MCP engine for hours; an update renames that running engine aside and copies the new one to
-/// the same path. A self-contained single-file engine loads its assemblies from its own path on first use, so before
-/// 1.3.3 every later tool call of that session failed with an empty error. Here the release build (self-contained,
-/// single file) is started, its file replaced the way install.ps1 does, and its tools must still answer.
+/// the same path. A self-contained single-file engine loaded its assemblies from its own path on first use, so before
+/// 1.3.3 every later tool call of that session failed with an empty error. Here the release build (Native AOT, one
+/// native image) is started, its file replaced the way the installer does, and its tools must still answer.
 /// </summary>
 public sealed class UpdateWhileRunningTests : IDisposable
 {
@@ -16,7 +16,7 @@ public sealed class UpdateWhileRunningTests : IDisposable
 
     public void Dispose() => TestEnvironment.DeleteOwnTemporary(root);
 
-    private string PublishSingleFile()
+    private string PublishRelease()
     {
         string rid = RuntimeInformation.OSArchitecture == Architecture.Arm64 ? "win-arm64" : "win-x64";
         string output = Path.Join(root, "publish");
@@ -25,13 +25,18 @@ public sealed class UpdateWhileRunningTests : IDisposable
             UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
         };
         foreach (string a in new[] { "publish", Path.Join(GetScriptTests.Repository(), "src", "NexusFree", "NexusFree.csproj"),
-            "-c", "Release", "-r", rid, "--self-contained", "true", "-p:PublishSingleFile=true", "-o", output, "--nologo" })
+            "-c", "Release", "-r", rid, "-p:DebugType=none", "-o", output, "--nologo" })
             info.ArgumentList.Add(a);
+        // Native AOT finds the C++ linker through vswhere, which is not on PATH outside a developer prompt.
+        string vswhere = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Microsoft Visual Studio", "Installer");
+        info.Environment["PATH"] = Environment.GetEnvironmentVariable("PATH") + Path.PathSeparator + vswhere;
         using var process = Process.Start(info)!;
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         Assert.True(process.WaitForExit(600_000), "dotnet publish did not finish");
         Assert.True(process.ExitCode == 0, stdout.Result + stderr.Result);
+        // Native AOT: one native image, nothing beside it to load later.
+        Assert.Equal(["NexusFree.exe"], Directory.GetFiles(output).Select(Path.GetFileName));
         return Path.Join(output, "NexusFree.exe");
     }
 
@@ -125,7 +130,7 @@ public sealed class UpdateWhileRunningTests : IDisposable
     {
         string install = Directory.CreateDirectory(Path.Join(root, "nexus-free")).FullName;
         string engine = Path.Join(install, "NexusFree.exe");
-        File.Copy(PublishSingleFile(), engine);
+        File.Copy(PublishRelease(), engine);
 
         var info = new ProcessStartInfo(engine, "--mcp")
         {

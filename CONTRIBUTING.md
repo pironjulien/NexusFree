@@ -13,7 +13,7 @@
 2. **Every new feature and every bug fix comes with its test** in `tests/NexusFree.Tests` (xUnit): MCP protocol,
    dispatcher, outbox, journal, `get.ps1`. A fix starts with a test that fails without it.
 3. Keep the safeguards: the dispatcher runs only requests whose file belongs to the authorized account, the access
-   rights of `daemon/setup-system.ps1` stay by SID, and the log records a request's id and exit code, never its
+   rights set by `SystemSetup.cs` stay by SID, and the log records a request's id and exit code, never its
    command. Read [SECURITY.md](SECURITY.md) before changing them.
 4. Never commit a secret, a token, a log or a build output: builds go to `%USERPROFILE%\.nexus\build\nexusfree`,
    outside the repository.
