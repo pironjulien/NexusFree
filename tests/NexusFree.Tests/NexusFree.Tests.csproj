@@ -10,7 +10,7 @@
     <RootNamespace>NexusFree.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="xunit.v3" Version="4.0.2" />
+    <PackageReference Include="xunit.v3" Version="4.0.3" />
     <ProjectReference Include="..\..\src\NexusFree\NexusFree.csproj" />
     <Using Include="Xunit" />
   </ItemGroup>
