@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Build: the dispatcher waits for a command's output with `WaitAsync` instead of racing it against a `Task.Delay`
+  that kept its timer running (analyzer CA2027, an error since 2026-11-21, broke the build).
 - Tests: the error-mode check in a child process expects only the two bits always inherited
   (`SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX`): the runtime briefly sets exactly those two while it loads a
   native library on another thread, so a child started in that window lacked `SEM_NOGPFAULTERRORBOX` and the check

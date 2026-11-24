@@ -207,7 +207,8 @@ internal sealed class Dispatcher
         var stdout = new OutputSink(process.StandardOutput.BaseStream);
         var stderr = new OutputSink(process.StandardError.BaseStream);
         await process.WaitForExitAsync();
-        await Task.WhenAny(Task.WhenAll(stdout.Completion, stderr.Completion), Task.Delay(OutputGrace));
+        await Task.WhenAll(stdout.Completion, stderr.Completion).WaitAsync(OutputGrace)
+            .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         string outText = DecodeOutput(stdout.Snapshot(), OemEncoding());
         string errText = DecodeOutput(stderr.Snapshot(), OemEncoding());
