@@ -112,7 +112,7 @@ flowchart LR
 ```
 
 - **Engine** (`src/NexusFree`): native C# (.NET 10, compiled ahead of time: one 4 MB `NexusFree.exe`) stdio MCP server,
-  also `--status`, `--exec "<command>"`, `--version`, `--install [--apply]` and `--setup-system --user-sid <SID>` (the
+  also `--help`, `--status`, `--exec "<command>"`, `--version`, `--install [--apply]` and `--setup-system --user-sid <SID>` (the
   elevated setup) and `--dispatch` (the SYSTEM side).
 - **Dispatcher** (`NexusFree.exe --dispatch`, the same engine copied to `%ProgramFiles%\NexusFree`): the scheduled task's
   only action, under `SYSTEM`. It moves each request out of the inbox, checks that its file belongs to the authorized

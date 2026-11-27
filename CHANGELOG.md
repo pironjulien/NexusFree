@@ -5,7 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- Dependencies: xUnit v3 4.0.3 for the tests; CodeQL action 4.39.3, setup-dotnet 6.1.0, zizmor action 0.8.1 and the
+  shared NexusSystem release workflows 1.8.0 in CI. Dependabot no longer proposes a new major of the AOT compiler
+  and trimmer alone: they follow the .NET 10 runtime that global.json pins.
+
 ### Fixed
+- `NexusFree.exe --help` printed nothing and seemed frozen: any argument the engine did not know started the MCP
+  server, which waits on its input. `--help` (`-h`) now prints the usage, and an unknown argument is refused with the
+  usage and exit code 2. With no argument, or with `--mcp`, the engine is still the MCP server of the AI apps.
 - Build: the dispatcher waits for a command's output with `WaitAsync` instead of racing it against a `Task.Delay`
   that kept its timer running (analyzer CA2027, an error since 2026-11-21, broke the build).
 - Tests: the error-mode check in a child process expects only the two bits always inherited

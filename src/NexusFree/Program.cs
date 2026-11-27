@@ -21,6 +21,20 @@ public static class Program
             return Report(() => SystemSetup.Run(sidIndex >= 0 && sidIndex + 1 < args.Length ? args[sidIndex + 1] : null));
         }
 
+        // A person at a terminal: --help answers, and an unknown argument is refused instead of starting the MCP server,
+        // which would wait on stdin with no output (`NexusFree.exe --help` looked frozen, 27/11/2026).
+        if (args.Contains("--help") || args.Contains("-h") || args.Contains("/?"))
+        {
+            Console.WriteLine(Usage);
+            return 0;
+        }
+        if (UnknownArgument(args) is { } unknown)
+        {
+            Console.Error.WriteLine($"NexusFree: unknown argument '{unknown}'.");
+            Console.Error.WriteLine(Usage);
+            return 2;
+        }
+
         int agentIndex = Array.IndexOf(args, "--agent");
         if (agentIndex >= 0 && agentIndex + 1 < args.Length)
         {
@@ -71,6 +85,30 @@ public static class Program
         // image: renaming its file aside for an update never takes anything from a running engine).
         await McpServer.RunStdioAsync();
         return 0;
+    }
+
+    internal const string Usage = """
+        Usage: NexusFree.exe [option]
+          --mcp [--agent <name>]   stdio MCP server for an AI app (also the default with no argument)
+          --exec "<command>"       run one command elevated (SYSTEM) and print its output
+          --status                 state of the elevation bridge, as JSON
+          --install [--apply]      install for this account (--apply writes the AI apps' configuration)
+          --version, -v            version
+          --help, -h               this help
+        """;
+
+    private static readonly string[] Flags = ["--dispatch", "--setup-system", "--mcp", "--install", "--apply", "--status", "--version", "-v"];
+    private static readonly string[] WithValue = ["--agent", "--exec", "--user-sid"];
+
+    /// <summary>The first argument the engine does not know (a value after --agent, --exec or --user-sid is not one), or null.</summary>
+    internal static string? UnknownArgument(string[] args)
+    {
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (WithValue.Contains(args[i])) { i++; continue; }
+            if (!Flags.Contains(args[i])) return args[i];
+        }
+        return null;
     }
 
     /// <summary>Runs a setup step; a failure is printed as one line and exit code 1, never as an unhandled crash.</summary>
