@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-11-27
+
+### Fixed
+- Journal: a SYSTEM command that fails without writing to stderr is recorded with its exit code (`exit code 1`)
+  instead of no cause at all (the empty error text was not treated as missing; seen on 2026-11-25).
+
 ## [1.4.1] - 2026-11-27
 
 ### Changed
@@ -232,7 +238,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Multi-agent plugins for Google Antigravity, Claude Code, and OpenAI Codex.
 - Offline unit and protocol test suite (`tests/NexusFree.Tests`).
 
-[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/pironjulien/NexusFree/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/pironjulien/NexusFree/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/pironjulien/NexusFree/compare/v1.3.4...v1.4.0
 [1.3.4]: https://github.com/pironjulien/NexusFree/compare/v1.3.3...v1.3.4

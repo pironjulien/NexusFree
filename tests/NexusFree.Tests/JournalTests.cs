@@ -89,4 +89,26 @@ public class JournalTests
             try { Directory.Delete(tempDir, true); } catch { }
         }
     }
+
+    [Fact]
+    public void Write_FailureWithEmptyErrorKeepsTheExitCode()
+    {
+        // 25/11/2026: a SYSTEM command that failed without writing to stderr was journaled with no cause at all.
+        string tempDir = Path.Combine(Path.GetTempPath(), "nexusfree-journal-test-" + Guid.NewGuid().ToString("N"));
+        string prevHome = Environment.GetEnvironmentVariable("NEXUS_JOURNAL_HOME") ?? "";
+        Environment.SetEnvironmentVariable("NEXUS_JOURNAL_HOME", tempDir);
+        try
+        {
+            Journal.Write("codex", "free", "sc query x", "req-test-2", false, 1, 10, "");
+            string nowMonth = DateTime.UtcNow.ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture);
+            var json = JsonNode.Parse(File.ReadAllLines(Path.Combine(tempDir, "free", "codex", $"{nowMonth}.jsonl"))[0]) as JsonObject;
+            Assert.Equal("✗", json!["issue"]?.ToString());
+            Assert.Equal("exit code 1", json["erreur"]?.ToString());
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("NEXUS_JOURNAL_HOME", string.IsNullOrEmpty(prevHome) ? null : prevHome);
+            try { Directory.Delete(tempDir, true); } catch { }
+        }
+    }
 }

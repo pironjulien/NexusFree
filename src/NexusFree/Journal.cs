@@ -109,7 +109,8 @@ public static partial class Journal
             var now = DateTimeOffset.UtcNow;
             string? app = action == "free" ? ExtractApp(command) : null;
             string issue = success ? "✓" : "✗";
-            string? errClean = success ? null : CleanError(error ?? (exitCode != 0 ? $"exit code {exitCode}" : null));
+            // An empty error (a command that failed without writing to stderr) falls back to its exit code.
+            string? errClean = success ? null : CleanError(string.IsNullOrWhiteSpace(error) ? (exitCode != 0 ? $"exit code {exitCode}" : null) : error);
 
             var row = new JsonObject
             {
