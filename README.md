@@ -37,7 +37,7 @@ after a single elevation at install time.
 <tr>
 <td width="33%">🛡️ <b>One UAC prompt, at install</b><br>Later runs, updates included, go through NexusFree itself.</td>
 <td width="33%">👤 <b>One authorized account</b><br>Only the account that installed it can queue commands; other accounts get no access.</td>
-<td width="33%">📜 <b>Every command logged</b><br>Each request run under <code>SYSTEM</code> is written to <code>logs\elevation.log</code>.</td>
+<td width="33%">📜 <b>Every request logged</b><br>Each request run under <code>SYSTEM</code> is written to <code>logs\elevation.log</code> (time, id, exit code; never the command's text).</td>
 </tr>
 <tr>
 <td>🤝 <b>One server, three AI apps</b><br>The same two tools in Claude Code, Codex and Antigravity.</td>
