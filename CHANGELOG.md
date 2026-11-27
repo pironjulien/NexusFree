@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-27
+
 ### Changed
 - Dependencies: xUnit v3 4.0.3 for the tests; CodeQL action 4.39.3, setup-dotnet 6.1.0, zizmor action 0.8.1 and the
   shared NexusSystem release workflows 1.8.0 in CI. Dependabot no longer proposes a new major of the AOT compiler
@@ -230,7 +232,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Multi-agent plugins for Google Antigravity, Claude Code, and OpenAI Codex.
 - Offline unit and protocol test suite (`tests/NexusFree.Tests`).
 
-[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.3.4...HEAD
+[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/pironjulien/NexusFree/compare/v1.4.0...v1.4.1
+[1.4.0]: https://github.com/pironjulien/NexusFree/compare/v1.3.4...v1.4.0
 [1.3.4]: https://github.com/pironjulien/NexusFree/compare/v1.3.3...v1.3.4
 [1.3.3]: https://github.com/pironjulien/NexusFree/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/pironjulien/NexusFree/compare/v1.3.1...v1.3.2
