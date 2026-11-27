@@ -47,7 +47,7 @@ public sealed class GetScriptTests : IDisposable
         };
         foreach (string a in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", Path.Join(Repository(), "get.ps1") })
             info.ArgumentList.Add(a);
-        // Windows PowerShell started from a .NET 10 process must not inherit PowerShell 7's module folders.
+        // Windows PowerShell started from a .NET 11 process must not inherit PowerShell 7's module folders.
         info.Environment.Remove("PSModulePath");
         info.Environment["NEXUS_FREE_SOURCE"] = Zip;
         info.Environment["NEXUS_FREE_HOME"] = Home;

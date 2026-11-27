@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-27
+
+### Changed
+- Runs on .NET 11: the engine is compiled ahead of time with the .NET 11 toolchain. Nothing to install: it is
+  still one native `NexusFree.exe` with no .NET runtime needed.
+
 ## [1.4.2] - 2026-11-27
 
 ### Fixed
@@ -238,7 +244,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Multi-agent plugins for Google Antigravity, Claude Code, and OpenAI Codex.
 - Offline unit and protocol test suite (`tests/NexusFree.Tests`).
 
-[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/pironjulien/NexusFree/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/pironjulien/NexusFree/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/pironjulien/NexusFree/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/pironjulien/NexusFree/compare/v1.3.4...v1.4.0

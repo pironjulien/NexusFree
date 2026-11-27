@@ -42,7 +42,7 @@ after a single elevation at install time.
 <tr>
 <td>🤝 <b>One server, three AI apps</b><br>The same two tools in Claude Code, Codex and Antigravity.</td>
 <td>🌍 <b>Any Windows language</b><br>Access rights are set by SID, so the install works whatever the system language.</td>
-<td>⚡ <b>Native engine</b><br>A C# (.NET 10) stdio MCP server, x64 and ARM64.</td>
+<td>⚡ <b>Native engine</b><br>A C# (.NET 11) stdio MCP server, x64 and ARM64.</td>
 </tr>
 </table>
 
@@ -91,7 +91,7 @@ git clone https://github.com/pironjulien/NexusFree
 powershell -NoProfile -ExecutionPolicy Bypass -File NexusFree\install.ps1 -Apply
 ```
 
-From the source it compiles the engine (Native AOT: the .NET 10 SDK and Visual Studio's C++ build tools); from a release package (`NexusFree-win-x64.zip`,
+From the source it compiles the engine (Native AOT: the .NET 11 SDK and Visual Studio's C++ build tools); from a release package (`NexusFree-win-x64.zip`,
 `NexusFree-win-arm64.zip`, checked against the release's `SHA256SUMS.txt`), the engine is already built. The `SYSTEM`
 side needs one UAC prompt; later runs (updates) go through NexusFree itself. Claude Code and Codex get the plugin from
 the [NexusSystem](https://github.com/pironjulien/NexusSystem) catalog; the engine declares it to Antigravity. `install.ps1` only starts
@@ -111,7 +111,7 @@ flowchart LR
     D -- "answer file" --> O["outbox"] --> E
 ```
 
-- **Engine** (`src/NexusFree`): native C# (.NET 10, compiled ahead of time: one 4 MB `NexusFree.exe`) stdio MCP server,
+- **Engine** (`src/NexusFree`): native C# (.NET 11, compiled ahead of time: one 4 MB `NexusFree.exe`) stdio MCP server,
   also `--help`, `--status`, `--exec "<command>"`, `--version`, `--install [--apply]` and `--setup-system --user-sid <SID>` (the
   elevated setup) and `--dispatch` (the SYSTEM side).
 - **Dispatcher** (`NexusFree.exe --dispatch`, the same engine copied to `%ProgramFiles%\NexusFree`): the scheduled task's
