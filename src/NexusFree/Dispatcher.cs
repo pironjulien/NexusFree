@@ -120,6 +120,9 @@ internal sealed class Dispatcher
     {
         string id = Path.GetFileNameWithoutExtension(request);
         string staged = Path.Combine(_staging, id + ".json");
+        string stopRequest = Path.Combine(_inbox, id + Engine.CancelExtension);
+        // Held from before the request leaves the inbox until after its answer: its caller reads "running" from it.
+        using FileStream? running = HoldRunningMarker(id);
         try
         {
             // Out of the inbox first: the authorized account can no longer change or replace it.
@@ -127,13 +130,14 @@ internal sealed class Dispatcher
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Another dispatcher instance took it (the task runs instances in parallel), or it is still being written.
+            // Another dispatcher instance took it (the task runs instances in parallel), its caller withdrew it, or it
+            // is still being written.
             Log($"Could not move {Path.GetFileName(request)} to staging ({ex.GetType().Name}): {ex.Message}", "ERROR");
             return;
         }
 
         DateTimeOffset started = DateTimeOffset.Now;
-        bool success = false;
+        bool success = false, stopped = false;
         int exitCode = 1;
         string output = "", error = "";
         try
@@ -146,10 +150,23 @@ internal sealed class Dispatcher
             catch (JsonException ex) { throw new DispatchException(Strings.RequestUnreadable(ex.Message)); }
 
             // Never the command itself: it can hold credentials or private administrative data.
-            Log($"Running request {id}");
-            (exitCode, output) = await RunCommandAsync(command);
-            success = exitCode == 0;
-            Log($"Request {id} finished (ExitCode: {exitCode})");
+            if (StopRequested(stopRequest))
+            {
+                stopped = true;
+                Log($"Request {id} stopped at its caller's request before it started");
+            }
+            else
+            {
+                Log($"Running request {id}");
+                (exitCode, output, stopped) = await RunCommandAsync(command, () => StopRequested(stopRequest));
+                success = !stopped && exitCode == 0;
+                Log(stopped ? $"Request {id} stopped at its caller's request" : $"Request {id} finished (ExitCode: {exitCode})");
+            }
+            if (stopped)
+            {
+                exitCode = Engine.CancelledExitCode;
+                error = Strings.Stopped;
+            }
         }
         catch (Exception ex) when (ex is DispatchException or IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
         {
@@ -160,9 +177,39 @@ internal sealed class Dispatcher
         }
         finally
         {
-            WriteAnswer(id, success, exitCode, output, error, started, DateTimeOffset.Now);
+            WriteAnswer(id, success, exitCode, output, error, started, DateTimeOffset.Now, stopped);
             TryDelete(staged);
+            TryDelete(stopRequest);
         }
+    }
+
+    /// <summary>How often a running command's stop request is looked for.</summary>
+    internal static readonly TimeSpan StopPoll = TimeSpan.FromMilliseconds(250);
+
+    /// <summary><c>outbox\&lt;id&gt;.running</c>, open for writing and deleted when closed, so it disappears with this
+    /// dispatcher whatever ends it. Null when it cannot be created: the request still runs, its state is just not shown.</summary>
+    private FileStream? HoldRunningMarker(string id)
+    {
+        try
+        {
+            return new FileStream(Path.Combine(_outbox, id + Engine.RunningExtension), FileMode.Create, FileAccess.Write, FileShare.Read, 1, FileOptions.DeleteOnClose);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }
+
+    /// <summary>True when the caller left a stop request for this request. Like a request, it counts only when its file
+    /// belongs to the authorized account, Administrators or SYSTEM; any other is removed and ignored.</summary>
+    private bool StopRequested(string stopRequest)
+    {
+        try
+        {
+            if (!File.Exists(stopRequest)) return false;
+            if (_owners.Contains(OwnerOf(stopRequest))) return true;
+            Log($"Stop request {Path.GetFileName(stopRequest)} ignored: its file does not belong to the authorized account.", "ERROR");
+            TryDelete(stopRequest);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        return false;
     }
 
     internal static string OwnerOf(string file)
@@ -186,8 +233,9 @@ internal sealed class Dispatcher
     }
 
     /// <summary>Runs the command in PowerShell (encoded, so quotes reach it unchanged) and returns its exit code and
-    /// its output, standard output then standard error.</summary>
-    internal async Task<(int ExitCode, string Output)> RunCommandAsync(string command)
+    /// its output, standard output then standard error. When <paramref name="stopRequested"/> turns true while it runs,
+    /// its whole process tree is ended and what it wrote until then is returned, marked as stopped.</summary>
+    internal async Task<(int ExitCode, string Output, bool Stopped)> RunCommandAsync(string command, Func<bool>? stopRequested = null)
     {
         var start = new ProcessStartInfo(_shell)
         {
@@ -203,17 +251,27 @@ internal sealed class Dispatcher
         }
 
         using var process = Process.Start(start) ?? throw new InvalidOperationException(Strings.ShellNotStarted(_shell));
+        using var tree = new ProcessJob(process);
         process.StandardInput.Close();
         var stdout = new OutputSink(process.StandardOutput.BaseStream);
         var stderr = new OutputSink(process.StandardError.BaseStream);
-        await process.WaitForExitAsync();
+        Task exit = process.WaitForExitAsync();
+        bool stopped = false;
+        while (stopRequested is not null && !stopped && !exit.IsCompleted)
+        {
+            await exit.WaitAsync(StopPoll).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            if (exit.IsCompleted || !stopRequested()) continue;
+            if (!tree.Stop()) break; // could not be ended: it runs to its own end and is answered as such
+            stopped = true;
+        }
+        await exit;
         await Task.WhenAll(stdout.Completion, stderr.Completion).WaitAsync(OutputGrace)
             .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         string outText = DecodeOutput(stdout.Snapshot(), OemEncoding());
         string errText = DecodeOutput(stderr.Snapshot(), OemEncoding());
         string output = outText.Length > 0 && errText.Length > 0 ? outText + "\n" + errText : outText.Length > 0 ? outText : errText;
-        return (process.ExitCode, output);
+        return (process.ExitCode, output, stopped);
     }
 
     /// <summary>The system's OEM code page, used by native programs that ignore the console's UTF-8 without a real
@@ -245,7 +303,7 @@ internal sealed class Dispatcher
 
     /// <summary>The answer under a temporary name, then renamed in the same folder (atomic on one volume): the client
     /// watches only <c>&lt;id&gt;.json</c>, so it never reads a half-written answer.</summary>
-    internal void WriteAnswer(string id, bool success, int exitCode, string output, string error, DateTimeOffset started, DateTimeOffset finished)
+    internal void WriteAnswer(string id, bool success, int exitCode, string output, string error, DateTimeOffset started, DateTimeOffset finished, bool stopped = false)
     {
         var answer = new JsonObject
         {
@@ -257,6 +315,7 @@ internal sealed class Dispatcher
             ["started"] = started.ToString("o", CultureInfo.InvariantCulture),
             ["finished"] = finished.ToString("o", CultureInfo.InvariantCulture),
         };
+        if (stopped) answer["stopped"] = true;
         string final = Path.Combine(_outbox, id + ".json");
         string temporary = final + ".tmp";
         try

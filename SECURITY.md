@@ -18,6 +18,9 @@ public issue. Include your Windows version, the account types involved and the s
   `%ProgramData%`): only `SYSTEM`, Administrators and the authorized account can write requests or read answers, and
   only they can start the task. The dispatcher also refuses a request whose file is not owned by the authorized
   account, Administrators or `SYSTEM`.
+- **Stopping and reading back:** a stop request is a file in the same inbox, accepted under the same ownership check
+  as a request, and can only end the command of the request it names. `free_result` runs nothing and asks nothing of
+  the `SYSTEM` side: it reads the outbox as the calling account, by an id that can only name a file of the spool.
 - **Logs:** every request is recorded in `%ProgramData%\NexusFree\logs\elevation.log` by its id and exit code, never its
   command; the AI app's own transcript keeps the command, so do not pass secrets on the command line.
 - **Updates:** `install.ps1 -Apply` runs `NexusFree.exe --setup-system` through an installed NexusFree, which replaces the dispatcher (`%ProgramFiles%\NexusFree\NexusFree.exe`) under `SYSTEM`; run it

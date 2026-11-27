@@ -40,7 +40,7 @@ after a single elevation at install time.
 <td width="33%">📜 <b>Every request logged</b><br>Each request run under <code>SYSTEM</code> is written to <code>logs\elevation.log</code> (time, id, exit code; never the command's text).</td>
 </tr>
 <tr>
-<td>🤝 <b>One server, three AI apps</b><br>The same two tools in Claude Code, Codex and Antigravity.</td>
+<td>🤝 <b>One server, three AI apps</b><br>The same three tools in Claude Code, Codex and Antigravity.</td>
 <td>🌍 <b>Any Windows language</b><br>Access rights are set by SID, so the install works whatever the system language.</td>
 <td>⚡ <b>Native engine</b><br>A C# (.NET 11) stdio MCP server, x64 and ARM64.</td>
 </tr>
@@ -49,7 +49,10 @@ after a single elevation at install time.
 ## 🧰 Tools
 
 - `free(command, timeout_seconds=600)`: runs a PowerShell command line under `SYSTEM` and returns its exit code and
-  output (stdout, then stderr).
+  output (stdout, then stderr). Cancelling the call stops the command and the processes it started; a wait that times
+  out leaves it running.
+- `free_result(id)`: after a wait that timed out, the result of that request by its id (kept 24 hours), or its state
+  while it still runs. Runs nothing.
 - `free_status()`: whether the `SYSTEM` task and the spool are installed.
 
 ## 🚀 Install
@@ -112,11 +115,11 @@ flowchart LR
 ```
 
 - **Engine** (`src/NexusFree`): native C# (.NET 11, compiled ahead of time: one 4 MB `NexusFree.exe`) stdio MCP server,
-  also `--help`, `--status`, `--exec "<command>"`, `--version`, `--install [--apply]` and `--setup-system --user-sid <SID>` (the
+  also `--help`, `--status`, `--exec "<command>"`, `--result <id>`, `--version`, `--install [--apply]` and `--setup-system --user-sid <SID>` (the
   elevated setup) and `--dispatch` (the SYSTEM side).
 - **Dispatcher** (`NexusFree.exe --dispatch`, the same engine copied to `%ProgramFiles%\NexusFree`): the scheduled task's
   only action, under `SYSTEM`. It moves each request out of the inbox, checks that its file belongs to the authorized
-  account, runs it, and writes the answer to the outbox (a temporary file renamed once complete). Every request is logged in `logs\elevation.log` (its id and exit code, never the command); the engine removes answers nobody collected after 24 hours.
+  account, runs it, and writes the answer to the outbox (a temporary file renamed once complete). Every request is logged in `logs\elevation.log` (its id and exit code, never the command); the engine removes answers nobody collected after 24 hours. While a command runs, the dispatcher watches the inbox for its caller's stop request (`<id>.cancel`, checked like a request) and then ends the command's whole process tree (a Windows job object).
 
 <details>
 <summary><b>Access rights</b> (set by <code>NexusFree.exe --setup-system</code>, by SID so any Windows language works)</summary>

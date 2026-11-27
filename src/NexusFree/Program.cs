@@ -72,13 +72,35 @@ public static class Program
         if (execIndex >= 0 && execIndex + 1 < args.Length)
         {
             string cmd = args[execIndex + 1];
-            var res = await Engine.ExecuteAsync(cmd);
+            // Ctrl+C stops the SYSTEM command too, instead of leaving it running without anyone to read it.
+            using var stop = new CancellationTokenSource();
+            Console.CancelKeyPress += (_, e) =>
+            {
+                e.Cancel = true;
+                try { stop.Cancel(); } catch (ObjectDisposedException) { }
+            };
+            var res = await Engine.ExecuteAsync(cmd, stop: stop.Token);
             Console.WriteLine(res.Output);
             if (!string.IsNullOrWhiteSpace(res.Error))
             {
                 Console.Error.WriteLine(res.Error);
             }
             return res.ExitCode;
+        }
+
+        int resultIndex = Array.IndexOf(args, "--result");
+        if (resultIndex >= 0 && resultIndex + 1 < args.Length)
+        {
+            string requestId = args[resultIndex + 1];
+            var status = Engine.ReadResult(requestId);
+            var (text, isError) = McpServer.FormatStatus(requestId, status);
+            (isError ? Console.Error : Console.Out).WriteLine(text.TrimEnd());
+            return status.State switch
+            {
+                RequestState.Done => status.Result!.ExitCode,
+                RequestState.Running or RequestState.Queued => StillActive,
+                _ => 1,
+            };
         }
 
         // Default, or with --mcp: stdio MCP server, which lives as long as its AI session, updates included (a native
@@ -90,15 +112,19 @@ public static class Program
     internal const string Usage = """
         Usage: NexusFree.exe [option]
           --mcp [--agent <name>]   stdio MCP server for an AI app (also the default with no argument)
-          --exec "<command>"       run one command elevated (SYSTEM) and print its output
-          --status                 state of the elevation bridge, as JSON
+          --exec "<command>"       run one command elevated (SYSTEM) and print its output (Ctrl+C stops it)
+          --result <id>            result of a request whose wait timed out (exit code 259 while it still runs)
+          --status                state of the elevation bridge, as JSON
           --install [--apply]      install for this account (--apply writes the AI apps' configuration)
           --version, -v            version
           --help, -h               this help
         """;
 
     private static readonly string[] Flags = ["--dispatch", "--setup-system", "--mcp", "--install", "--apply", "--status", "--version", "-v"];
-    private static readonly string[] WithValue = ["--agent", "--exec", "--user-sid"];
+    private static readonly string[] WithValue = ["--agent", "--exec", "--result", "--user-sid"];
+
+    /// <summary>Windows' STILL_ACTIVE: the exit code of <c>--result</c> for a request that has not ended yet.</summary>
+    internal const int StillActive = 259;
 
     /// <summary>The first argument the engine does not know (a value after --agent, --exec or --user-sid is not one), or null.</summary>
     internal static string? UnknownArgument(string[] args)

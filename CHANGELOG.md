@@ -5,6 +5,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-28
+
+### Added
+- Cancelling a `free` call stops its command. When the AI app cancels the call (you interrupt the agent), the
+  command, the processes it started and theirs are ended under `SYSTEM`, instead of running on with nobody to read
+  them. The outcome is recorded as stopped, never as a success: exit code 130, the output written until then, and
+  `Request <id> stopped at its caller's request` in `logs\elevation.log`. A request still waiting for the `SYSTEM` task
+  is withdrawn and never runs. `NexusFree.exe --exec` does the same on Ctrl+C. What the command had already done is
+  not undone.
+- `free_result(id)`: reads the result of a request whose wait timed out, by the id the timeout message gives. Once the
+  command has ended it returns its exit code and output (kept 24 hours, readable more than once); before that it says
+  whether the command is still running or still waiting. It runs nothing and reads the spool as your own account, so
+  it opens no new way in. Same from a terminal: `NexusFree.exe --result <id>` (exit code 259 while it still runs).
+
+### Changed
+- A wait that times out still leaves the command running, on purpose (a long repair is read later with
+  `free_result`); the timeout message now says so and names the id to read. The server's instructions and the plugin
+  guide say the same in the three AI apps.
+
 ## [1.5.0] - 2026-11-27
 
 ### Changed
@@ -244,7 +263,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Multi-agent plugins for Google Antigravity, Claude Code, and OpenAI Codex.
 - Offline unit and protocol test suite (`tests/NexusFree.Tests`).
 
-[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/pironjulien/NexusFree/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/pironjulien/NexusFree/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/pironjulien/NexusFree/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/pironjulien/NexusFree/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/pironjulien/NexusFree/compare/v1.4.0...v1.4.1

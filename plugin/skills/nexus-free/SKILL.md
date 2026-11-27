@@ -20,16 +20,26 @@ MCP server for universal elevation shared by Claude, Codex and Antigravity.
   elevation does not change the goal of the operation.
 - SYSTEM has its own profile, environment and current directory: use absolute paths for the user's scripts and
   files.
-- The wait timeout of `free` does not necessarily stop the SYSTEM command. After a timeout or a disconnection, check
-  the actual state and the request before running again an operation that could run twice.
+- The wait timeout of `free` does not stop the SYSTEM command: it keeps running. The timeout message gives the
+  request id; read its state and its result with `free_result(id)` before running again an operation that could run
+  twice.
+- Cancelling a `free` call (the user interrupts) stops its command and the processes it started. What it had already
+  done is not undone: check the actual state before going on.
 
 ## Tools
 
 ### `free(command, timeout_seconds=600)`
 Runs any PowerShell command or binary with `SYSTEM` rights, without any UAC window.
 * `command` (required): exact PowerShell command, binary or script call to run elevated.
-* `timeout_seconds` (optional, default 600): time limit in seconds.
-* Returns: the exit code and the command's output; an error is flagged with `isError`.
+* `timeout_seconds` (optional, default 600): longest wait in seconds; the command keeps running past it.
+* Returns: the exit code and the command's output; an error is flagged with `isError`. A stopped command comes back
+  with exit code 130 and is never a success.
+
+### `free_result(id)`
+Reads the result of a `free` request whose wait timed out. Runs nothing.
+* `id` (required): the request id of the timeout message (`req-...`).
+* Returns: the exit code and output once the command has ended (kept 24 hours, readable again), or its state: still
+  running, waiting for the SYSTEM task, or unknown.
 
 ### `free_status()`
 Checks the health of the SYSTEM bridge: the scheduled task's state and last run, and the communication spool.

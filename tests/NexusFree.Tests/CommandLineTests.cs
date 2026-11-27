@@ -12,6 +12,7 @@ public sealed class CommandLineTests
     [InlineData("--exec --help")]
     [InlineData("--install --apply")]
     [InlineData("--status")]
+    [InlineData("--result req-0123456789abcdef0123456789abcdef")]
     [InlineData("-v")]
     public void Known_arguments_are_accepted(string line) => Assert.Null(Program.UnknownArgument(Split(line)));
 
