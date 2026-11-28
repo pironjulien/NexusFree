@@ -57,7 +57,10 @@ after a single elevation at install time.
 
 ## 🚀 Install
 
-Windows 10 or 11, as the account that will use it (not another account's elevated prompt).
+Windows 10 or 11 (including with Windows 11 **Administrator Protection** enabled: after the single elevation at first
+install, updates and `free` commands run through the `SYSTEM` task with no further prompt, verified on Windows 11 24H2
+with `TypeOfAdminApprovalMode=2` where the caller stays at medium integrity with `Administrators` deny-only), as the
+account that will use it (not another account's elevated prompt).
 
 > [!TIP]
 > **Let your AI install it.** NexusFree is opt-in in NexusSystem: it is installed only when you name it. Paste into
